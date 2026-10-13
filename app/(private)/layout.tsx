@@ -1,21 +1,17 @@
-import { ThemeProvider } from "@/lib/theme/theme-provider"
-import { UserProvider } from "@/lib/user/provider"
+import { AppShell } from "@/components/app-shell"
+import { cookies } from "next/headers"
 
-export default function PrivateLayout({
+/** Must match `SIDEBAR_COOKIE_NAME` in `components/ui/sidebar.tsx`. */
+const SIDEBAR_COOKIE_NAME = "sidebar_state"
+
+export default async function PrivateLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="system"
-      enableSystem
-      disableTransitionOnChange
-    >
-      <UserProvider>
-        <div className="mx-auto px-0">{children}</div>
-      </UserProvider>
-    </ThemeProvider>
-  )
+  const cookieStore = await cookies()
+  const defaultSidebarOpen =
+    cookieStore.get(SIDEBAR_COOKIE_NAME)?.value !== "false"
+
+  return <AppShell defaultSidebarOpen={defaultSidebarOpen}>{children}</AppShell>
 }
