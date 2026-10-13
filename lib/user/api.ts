@@ -1,7 +1,7 @@
 import { User } from "./types"
 
 export const getUser = async (): Promise<User> => {
-  const response = await fetch("/api/users", {
+  const response = await fetch("/api/users/me", {
     method: "GET",
   })
 
