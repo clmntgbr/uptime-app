@@ -69,29 +69,6 @@ export default function WorkflowPage() {
         </div>
       </div>
 
-      {deleteMutation.error && (
-        <p className="text-destructive">{deleteMutation.error.message}</p>
-      )}
-
-      <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2">
-        <dt className="text-muted-foreground">Interval</dt>
-        <dd>{workflow.intervalSeconds}s</dd>
-        <dt className="text-muted-foreground">Enabled</dt>
-        <dd>{workflow.enabled ? "Yes" : "No"}</dd>
-        <dt className="text-muted-foreground">Status</dt>
-        <dd>{workflow.status ?? "—"}</dd>
-        <dt className="text-muted-foreground">Last status</dt>
-        <dd>{workflow.lastStatus ?? "—"}</dd>
-        <dt className="text-muted-foreground">Last run</dt>
-        <dd>{formatDate(workflow.lastRunAt)}</dd>
-        <dt className="text-muted-foreground">Next run</dt>
-        <dd>{formatDate(workflow.nextRunAt)}</dd>
-        <dt className="text-muted-foreground">Created</dt>
-        <dd>{formatDate(workflow.createdAt)}</dd>
-        <dt className="text-muted-foreground">Updated</dt>
-        <dd>{formatDate(workflow.updatedAt)}</dd>
-      </dl>
-
       <CallList workflowId={workflow.id} />
 
       <WorkflowDrawer
