@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { useDeleteWorkflow, useWorkflows } from "@/lib/workflow/hooks"
+import Link from "next/link"
 import { useState } from "react"
 
 const PAGE_LIMIT = 20
@@ -57,7 +58,12 @@ export default function Page() {
               key={workflow.id}
               className="flex items-center justify-between gap-2 px-4 py-2"
             >
-              <span className="truncate">{workflow.name}</span>
+              <Link
+                href={`/workflows/${workflow.id}`}
+                className="truncate hover:underline"
+              >
+                {workflow.name}
+              </Link>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
