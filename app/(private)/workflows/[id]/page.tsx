@@ -1,5 +1,6 @@
 "use client"
 
+import { CallList } from "@/components/call/call-list"
 import { Button } from "@/components/ui/button"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { useDeleteWorkflow, useWorkflow } from "@/lib/workflow/hooks"
@@ -90,6 +91,8 @@ export default function WorkflowPage() {
         <dt className="text-muted-foreground">Updated</dt>
         <dd>{formatDate(workflow.updatedAt)}</dd>
       </dl>
+
+      <CallList workflowId={workflow.id} />
 
       <WorkflowDrawer
         open={drawerOpen}

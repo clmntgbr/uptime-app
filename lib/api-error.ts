@@ -17,9 +17,18 @@ export async function parseApiError(
 
   try {
     const body = await response.json()
-    const candidate = body?.data?.message ?? body?.message
+    const payload = body?.data ?? body
+    const candidate = payload?.message
     if (typeof candidate === "string" && candidate.trim()) {
       message = candidate
+    }
+
+    const fieldErrors = payload?.errors
+    if (fieldErrors && typeof fieldErrors === "object") {
+      const details = Object.entries(fieldErrors)
+        .map(([field, error]) => `${field} ${error}`)
+        .join(", ")
+      if (details) message = `${message}: ${details}`
     }
   } catch {
     // Body is empty or not JSON.
