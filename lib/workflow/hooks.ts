@@ -13,6 +13,7 @@ import {
   deleteWorkflow,
   getWorkflow,
   listWorkflows,
+  runWorkflow,
   updateWorkflow,
 } from "./api"
 import { WorkflowInput } from "./types"
@@ -58,6 +59,19 @@ export function useUpdateWorkflow() {
           queryKey: queryKeys.workflows.detail(id),
         }),
       ]),
+  })
+}
+
+export function useRunWorkflow() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => runWorkflow(id),
+    onSuccess: (_data, id) =>
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workflows.detail(id),
+        exact: true,
+      }),
   })
 }
 

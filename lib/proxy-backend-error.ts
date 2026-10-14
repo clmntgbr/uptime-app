@@ -18,5 +18,8 @@ export async function proxyBackendError(
     }
   }
 
-  return NextResponse.json({ success: false, data }, { status: response.status })
+  return NextResponse.json(
+    { success: false, data },
+    { status: response.status }
+  )
 }

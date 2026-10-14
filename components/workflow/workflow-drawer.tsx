@@ -16,7 +16,11 @@ import {
   useUpdateWorkflow,
   useWorkflow,
 } from "@/lib/workflow/hooks"
-import { Workflow, WorkflowInput } from "@/lib/workflow/types"
+import {
+  Workflow,
+  WorkflowInput,
+  WorkflowScheduleType,
+} from "@/lib/workflow/types"
 import { useState } from "react"
 
 interface WorkflowDrawerProps {
@@ -87,6 +91,20 @@ interface WorkflowFormProps {
   onSubmit: (input: WorkflowInput) => Promise<void>
 }
 
+const SCHEDULE_TYPES: { value: WorkflowScheduleType; label: string }[] = [
+  { value: "interval", label: "Every N seconds" },
+  { value: "once", label: "Once, at the next minute" },
+  { value: "at", label: "Once, at a given date" },
+]
+
+/** `datetime-local` works in local time without seconds. */
+function toDateTimeLocal(iso?: string): string {
+  if (!iso) return ""
+  const date = new Date(iso)
+  const offsetMs = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
 function WorkflowForm({
   workflow,
   isPending,
@@ -94,9 +112,13 @@ function WorkflowForm({
   onSubmit,
 }: WorkflowFormProps) {
   const [name, setName] = useState(workflow?.name ?? "")
+  const [scheduleType, setScheduleType] = useState<WorkflowScheduleType>(
+    workflow?.scheduleType ?? "interval"
+  )
   const [intervalSeconds, setIntervalSeconds] = useState(
     String(workflow?.intervalSeconds ?? 300)
   )
+  const [runAt, setRunAt] = useState(toDateTimeLocal(workflow?.runAt))
   const [enabled, setEnabled] = useState(workflow?.enabled ?? true)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -105,7 +127,11 @@ function WorkflowForm({
     try {
       await onSubmit({
         name: name.trim(),
-        intervalSeconds: Number(intervalSeconds),
+        scheduleType,
+        intervalSeconds:
+          scheduleType === "interval" ? Number(intervalSeconds) : undefined,
+        runAt:
+          scheduleType === "at" ? new Date(runAt).toISOString() : undefined,
         enabled,
       })
     } catch {
@@ -127,17 +153,50 @@ function WorkflowForm({
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="workflow-interval">Interval (seconds)</Label>
-        <Input
-          id="workflow-interval"
-          type="number"
-          min={60}
-          max={604800}
-          value={intervalSeconds}
-          onChange={(event) => setIntervalSeconds(event.target.value)}
-          required
-        />
+        <Label htmlFor="workflow-schedule">Schedule</Label>
+        <select
+          id="workflow-schedule"
+          value={scheduleType}
+          onChange={(event) =>
+            setScheduleType(event.target.value as WorkflowScheduleType)
+          }
+          className="h-8 rounded-md border border-input bg-transparent px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        >
+          {SCHEDULE_TYPES.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
+
+      {scheduleType === "interval" && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="workflow-interval">Interval (seconds)</Label>
+          <Input
+            id="workflow-interval"
+            type="number"
+            min={60}
+            max={604800}
+            value={intervalSeconds}
+            onChange={(event) => setIntervalSeconds(event.target.value)}
+            required
+          />
+        </div>
+      )}
+
+      {scheduleType === "at" && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="workflow-run-at">Run at (local time)</Label>
+          <Input
+            id="workflow-run-at"
+            type="datetime-local"
+            value={runAt}
+            onChange={(event) => setRunAt(event.target.value)}
+            required
+          />
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <Switch

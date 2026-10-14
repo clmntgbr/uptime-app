@@ -5,6 +5,7 @@ import {
   WorkflowIdResponse,
   WorkflowInput,
   WorkflowListItem,
+  WorkflowRunResponse,
 } from "./types"
 
 export const listWorkflows = async (
@@ -59,6 +60,16 @@ export const updateWorkflow = async (
 
   if (!response.ok) {
     throw await parseApiError(response, "Failed to update workflow")
+  }
+
+  return response.json()
+}
+
+export const runWorkflow = async (id: string): Promise<WorkflowRunResponse> => {
+  const response = await fetch(`/api/workflows/${id}/runs`, { method: "POST" })
+
+  if (!response.ok) {
+    throw await parseApiError(response, "Failed to run workflow")
   }
 
   return response.json()

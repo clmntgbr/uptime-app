@@ -3,13 +3,34 @@
 import { CallList } from "@/components/call/call-list"
 import { Button } from "@/components/ui/button"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
-import { useDeleteWorkflow, useWorkflow } from "@/lib/workflow/hooks"
+import { ApiError } from "@/lib/api-error"
+import {
+  useDeleteWorkflow,
+  useRunWorkflow,
+  useWorkflow,
+} from "@/lib/workflow/hooks"
+import { Workflow } from "@/lib/workflow/types"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 
-function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleString() : "—"
+function formatSchedule(workflow: Workflow) {
+  switch (workflow.scheduleType) {
+    case "interval":
+      return `Every ${workflow.intervalSeconds}s`
+    case "once":
+      return "Once, at the next minute"
+    case "at":
+      return workflow.runAt
+        ? `Once, at ${new Date(workflow.runAt).toLocaleString()}`
+        : "Once, at a given date"
+  }
+}
+
+function formatRunError(error: Error) {
+  return error instanceof ApiError && error.code === "RUN_IN_PROGRESS"
+    ? "A run is already in progress."
+    : error.message
 }
 
 export default function WorkflowPage() {
@@ -19,6 +40,7 @@ export default function WorkflowPage() {
 
   const workflowQuery = useWorkflow(id)
   const deleteMutation = useDeleteWorkflow()
+  const runMutation = useRunWorkflow()
 
   const handleDelete = () => {
     const workflow = workflowQuery.data
@@ -54,8 +76,20 @@ export default function WorkflowPage() {
       </Link>
 
       <div className="flex items-center justify-between gap-2">
-        <h1 className="truncate text-lg font-semibold">{workflow.name}</h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold">{workflow.name}</h1>
+          <p className="text-muted-foreground">
+            {formatSchedule(workflow)} ·{" "}
+            {workflow.enabled ? "Enabled" : "Disabled"}
+          </p>
+        </div>
         <div className="flex gap-2">
+          <Button
+            disabled={runMutation.isPending}
+            onClick={() => runMutation.mutate(workflow.id)}
+          >
+            {runMutation.isPending ? "Starting…" : "Run"}
+          </Button>
           <Button variant="outline" onClick={() => setDrawerOpen(true)}>
             Edit
           </Button>
@@ -68,6 +102,18 @@ export default function WorkflowPage() {
           </Button>
         </div>
       </div>
+
+      {runMutation.isSuccess && (
+        <p className="text-muted-foreground">
+          Run started ({runMutation.data.runId}).
+        </p>
+      )}
+      {runMutation.error && (
+        <p className="text-destructive">{formatRunError(runMutation.error)}</p>
+      )}
+      {deleteMutation.error && (
+        <p className="text-destructive">{deleteMutation.error.message}</p>
+      )}
 
       <CallList workflowId={workflow.id} />
 

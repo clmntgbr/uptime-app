@@ -1,19 +1,22 @@
 export class ApiError extends Error {
   readonly status: number
+  readonly code?: string
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.name = "ApiError"
     this.status = status
+    this.code = code
   }
 }
 
-/** Reads `{ data: { message } }` produced by `proxyBackendError`. */
+/** Reads `{ data: { message, code, errors } }` produced by `proxyBackendError`. */
 export async function parseApiError(
   response: Response,
   fallbackMessage: string
 ): Promise<ApiError> {
   let message = fallbackMessage
+  let code: string | undefined
 
   try {
     const body = await response.json()
@@ -21,6 +24,10 @@ export async function parseApiError(
     const candidate = payload?.message
     if (typeof candidate === "string" && candidate.trim()) {
       message = candidate
+    }
+
+    if (typeof payload?.code === "string") {
+      code = payload.code
     }
 
     const fieldErrors = payload?.errors
@@ -34,5 +41,5 @@ export async function parseApiError(
     // Body is empty or not JSON.
   }
 
-  return new ApiError(message, response.status)
+  return new ApiError(message, response.status, code)
 }
