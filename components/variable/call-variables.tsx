@@ -20,6 +20,7 @@ import {
   useResponseKeys,
   useUpdateCallVariable,
 } from "@/lib/variable/hooks"
+import { validateVariableName, VARIABLE_NAME_HINT } from "@/lib/variable/name"
 import {
   CallVariable,
   CallVariableCreateInput,
@@ -430,6 +431,7 @@ function CallVariableForm({
   const [path, setPath] = useState(variable?.path ?? "")
   const [secret, setSecret] = useState(variable?.secret ?? false)
   const [pathFocused, setPathFocused] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
 
   const responseKeysQuery = useResponseKeys(
     workflowId,
@@ -448,6 +450,11 @@ function CallVariableForm({
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!variable) {
+      const invalid = validateVariableName(name)
+      setNameError(invalid)
+      if (invalid) return
+    }
     try {
       await onSubmit(name.trim(), source, path.trim(), secret)
     } catch {
@@ -462,11 +469,20 @@ function CallVariableForm({
         <Input
           id="call-variable-name"
           value={name}
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => {
+            setName(event.target.value)
+            setNameError(null)
+          }}
           maxLength={64}
           disabled={!!variable}
+          pattern="^[A-Za-z_][A-Za-z0-9_]*$"
+          title={VARIABLE_NAME_HINT}
           required
         />
+        {!variable && (
+          <p className="text-muted-foreground">{VARIABLE_NAME_HINT}</p>
+        )}
+        {nameError && <p className="text-destructive">{nameError}</p>}
       </div>
 
       <div className="flex flex-col gap-2">

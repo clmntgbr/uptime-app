@@ -19,6 +19,7 @@ import {
   useGlobalVariables,
   useUpdateGlobalVariable,
 } from "@/lib/variable/hooks"
+import { validateVariableName, VARIABLE_NAME_HINT } from "@/lib/variable/name"
 import { GlobalVariable } from "@/lib/variable/types"
 import { useState } from "react"
 
@@ -201,9 +202,15 @@ function GlobalVariableForm({
     variable && !variable.secret ? variable.value : ""
   )
   const [secret, setSecret] = useState(variable?.secret ?? false)
+  const [nameError, setNameError] = useState<string | null>(null)
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (!variable) {
+      const invalid = validateVariableName(name)
+      setNameError(invalid)
+      if (invalid) return
+    }
     try {
       await onSubmit(name.trim(), value, secret)
     } catch {
@@ -218,11 +225,20 @@ function GlobalVariableForm({
         <Input
           id="global-variable-name"
           value={name}
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => {
+            setName(event.target.value)
+            setNameError(null)
+          }}
           maxLength={64}
           disabled={!!variable}
+          pattern="^[A-Za-z_][A-Za-z0-9_]*$"
+          title={VARIABLE_NAME_HINT}
           required
         />
+        {!variable && (
+          <p className="text-muted-foreground">{VARIABLE_NAME_HINT}</p>
+        )}
+        {nameError && <p className="text-destructive">{nameError}</p>}
       </div>
 
       <div className="flex flex-col gap-2">
