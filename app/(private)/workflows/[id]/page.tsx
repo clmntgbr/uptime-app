@@ -2,6 +2,7 @@
 
 import { CallList } from "@/components/call/call-list"
 import { Button } from "@/components/ui/button"
+import { StaticVariables } from "@/components/variable/static-variables"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { ApiError } from "@/lib/api-error"
 import {
@@ -116,6 +117,8 @@ export default function WorkflowPage() {
       )}
 
       <CallList workflowId={workflow.id} />
+
+      <StaticVariables workflowId={workflow.id} />
 
       <WorkflowDrawer
         open={drawerOpen}

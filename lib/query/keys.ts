@@ -22,4 +22,43 @@ export const queryKeys = {
     detail: (workflowId: string, callId: string) =>
       [...queryKeys.calls.all(workflowId), callId] as const,
   },
+
+  globalVariables: {
+    all: ["global-variables"] as const,
+    list: () => [...queryKeys.globalVariables.all, "list"] as const,
+    detail: (id: string) => [...queryKeys.globalVariables.all, id] as const,
+  },
+
+  staticVariables: {
+    all: (workflowId: string) =>
+      [...queryKeys.workflows.detail(workflowId), "variables"] as const,
+    list: (workflowId: string) =>
+      [...queryKeys.staticVariables.all(workflowId), "list"] as const,
+    detail: (workflowId: string, name: string) =>
+      [...queryKeys.staticVariables.all(workflowId), name] as const,
+  },
+
+  callVariables: {
+    all: (workflowId: string, callId: string) =>
+      [...queryKeys.calls.detail(workflowId, callId), "variables"] as const,
+    list: (workflowId: string, callId: string) =>
+      [...queryKeys.callVariables.all(workflowId, callId), "list"] as const,
+    detail: (workflowId: string, callId: string, name: string) =>
+      [...queryKeys.callVariables.all(workflowId, callId), name] as const,
+  },
+
+  /** Kept apart: any variable change (global, static or call) affects it. */
+  availableVariables: {
+    all: ["available-variables"] as const,
+    list: (workflowId: string, callId: string) =>
+      [...queryKeys.availableVariables.all, workflowId, callId] as const,
+  },
+
+  responseKeys: {
+    list: (workflowId: string, callId: string) =>
+      [
+        ...queryKeys.calls.detail(workflowId, callId),
+        "response-keys",
+      ] as const,
+  },
 } as const

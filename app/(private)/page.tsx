@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { GlobalVariables } from "@/components/variable/global-variables"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { useDeleteWorkflow, useWorkflows } from "@/lib/workflow/hooks"
 import Link from "next/link"
@@ -122,6 +123,8 @@ export default function Page() {
         onOpenChange={setDrawerOpen}
         workflowId={editedId}
       />
+
+      <GlobalVariables />
     </div>
   )
 }

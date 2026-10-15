@@ -1,5 +1,11 @@
 "use client"
 
+import {
+  fromRecord,
+  KeyValueEditor,
+  KeyValuePair,
+  toRecord,
+} from "@/components/call/key-value-editor"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,6 +18,12 @@ import {
 } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  AvailableVariables,
+  CallVariables,
+  DraftCallVariables,
+} from "@/components/variable/call-variables"
+import { VariableInput } from "@/components/variable/variable-input"
 import { useCall, useCreateCall, useUpdateCall } from "@/lib/call/hooks"
 import {
   CallDetail,
@@ -19,6 +31,11 @@ import {
   CallIpVersion,
   CallMethod,
 } from "@/lib/call/types"
+import { queryKeys } from "@/lib/query/keys"
+import { createCallVariable } from "@/lib/variable/api"
+import { useCallFormVariables } from "@/lib/variable/hooks"
+import { CallVariableCreateInput } from "@/lib/variable/types"
+import { useQueryClient } from "@tanstack/react-query"
 import { useState } from "react"
 
 const METHODS: CallMethod[] = [
@@ -51,17 +68,54 @@ export function CallDrawer({
   callId,
 }: CallDrawerProps) {
   const isEdit = callId !== null
+  const queryClient = useQueryClient()
   const callQuery = useCall(workflowId, open ? callId : null)
   const createMutation = useCreateCall(workflowId)
   const updateMutation = useUpdateCall(workflowId)
+  const [draftVariables, setDraftVariables] = useState<CallVariableCreateInput[]>(
+    []
+  )
+  const [isCreatingVariables, setIsCreatingVariables] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
-  const mutation = isEdit ? updateMutation : createMutation
+  const isPending =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    isCreatingVariables
 
   const handleSubmit = async (input: CallInput) => {
+    setCreateError(null)
     if (callId) {
       await updateMutation.mutateAsync({ callId, input })
-    } else {
-      await createMutation.mutateAsync(input)
+      onOpenChange(false)
+      return
+    }
+
+    const created = await createMutation.mutateAsync(input)
+    if (draftVariables.length) {
+      setIsCreatingVariables(true)
+      try {
+        for (const draft of draftVariables) {
+          await createCallVariable(workflowId, created.id, draft)
+        }
+        await Promise.all([
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.workflows.detail(workflowId),
+          }),
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.availableVariables.all,
+          }),
+        ])
+      } catch (error) {
+        setCreateError(
+          error instanceof Error
+            ? `Call created, but a variable failed: ${error.message}`
+            : "Call created, but a variable failed."
+        )
+        return
+      } finally {
+        setIsCreatingVariables(false)
+      }
     }
     onOpenChange(false)
   }
@@ -70,6 +124,9 @@ export function CallDrawer({
     if (!next) {
       createMutation.reset()
       updateMutation.reset()
+      setDraftVariables([])
+      setCreateError(null)
+      setIsCreatingVariables(false)
     }
     onOpenChange(next)
   }
@@ -86,42 +143,59 @@ export function CallDrawer({
         ) : isEdit && callQuery.error ? (
           <p className="px-4 text-destructive">{callQuery.error.message}</p>
         ) : open ? (
-          <CallForm
-            key={callQuery.data?.id ?? "new"}
-            call={isEdit ? callQuery.data : undefined}
-            isPending={mutation.isPending}
-            error={mutation.error?.message ?? null}
-            onSubmit={handleSubmit}
-          />
+          <>
+            <CallForm
+              key={callQuery.data?.id ?? "new"}
+              workflowId={workflowId}
+              callId={callId}
+              call={isEdit ? callQuery.data : undefined}
+              isPending={isPending}
+              error={createError ?? (isEdit ? updateMutation : createMutation).error?.message ?? null}
+              onSubmit={handleSubmit}
+            />
+            <div className="flex flex-col gap-4 border-t p-4">
+              {callId ? (
+                <>
+                  <CallVariables workflowId={workflowId} callId={callId} />
+                  <AvailableVariables workflowId={workflowId} callId={callId} />
+                </>
+              ) : (
+                <DraftCallVariables
+                  drafts={draftVariables}
+                  onChange={setDraftVariables}
+                />
+              )}
+            </div>
+          </>
         ) : null}
       </SheetContent>
     </Sheet>
   )
 }
 
-function parseJsonField<T>(label: string, value: string): T | undefined {
-  if (!value.trim()) return undefined
-  try {
-    return JSON.parse(value) as T
-  } catch {
-    throw new Error(`${label} must be valid JSON.`)
-  }
-}
-
-function formatJsonField(value?: Record<string, string>): string {
-  return value && Object.keys(value).length
-    ? JSON.stringify(value, null, 2)
-    : ""
-}
+const DEFAULT_HEADERS: KeyValuePair[] = [
+  { key: "Content-Type", value: "application/json" },
+]
 
 interface CallFormProps {
+  workflowId: string
+  callId: string | null
   call?: CallDetail
   isPending: boolean
   error: string | null
   onSubmit: (input: CallInput) => Promise<void>
 }
 
-function CallForm({ call, isPending, error, onSubmit }: CallFormProps) {
+function CallForm({
+  workflowId,
+  callId,
+  call,
+  isPending,
+  error,
+  onSubmit,
+}: CallFormProps) {
+  const variables = useCallFormVariables(workflowId, callId)
+
   const [name, setName] = useState(call?.name ?? "")
   const [method, setMethod] = useState<CallMethod>(call?.method ?? "GET")
   const [url, setUrl] = useState(call?.url ?? "")
@@ -132,17 +206,16 @@ function CallForm({ call, isPending, error, onSubmit }: CallFormProps) {
   )
   const [proxyUrl, setProxyUrl] = useState(call?.proxyUrl ?? "")
   const [body, setBody] = useState(call?.body ?? "")
-  const [headers, setHeaders] = useState(formatJsonField(call?.headers))
-  const [query, setQuery] = useState(formatJsonField(call?.query))
-  const [formError, setFormError] = useState<string | null>(null)
+  const [headers, setHeaders] = useState<KeyValuePair[]>(
+    call ? fromRecord(call.headers) : DEFAULT_HEADERS
+  )
+  const [query, setQuery] = useState<KeyValuePair[]>(fromRecord(call?.query))
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setFormError(null)
 
-    let input: CallInput
     try {
-      input = {
+      await onSubmit({
         name: name.trim(),
         method,
         url: url.trim(),
@@ -151,16 +224,9 @@ function CallForm({ call, isPending, error, onSubmit }: CallFormProps) {
         ipVersion,
         proxyUrl: proxyUrl.trim() || undefined,
         body: body || undefined,
-        headers: parseJsonField("Headers", headers),
-        query: parseJsonField("Query", query),
-      }
-    } catch (parseError) {
-      setFormError((parseError as Error).message)
-      return
-    }
-
-    try {
-      await onSubmit(input)
+        headers: toRecord(headers),
+        query: toRecord(query),
+      })
     } catch {
       // Displayed through the mutation error.
     }
@@ -197,10 +263,11 @@ function CallForm({ call, isPending, error, onSubmit }: CallFormProps) {
         </div>
         <div className="flex flex-1 flex-col gap-2">
           <Label htmlFor="call-url">URL</Label>
-          <Input
+          <VariableInput
             id="call-url"
             value={url}
-            onChange={(event) => setUrl(event.target.value)}
+            onChange={setUrl}
+            variables={variables}
             placeholder="https://api.example.com/{{path}}"
             maxLength={2048}
             required
@@ -251,10 +318,11 @@ function CallForm({ call, isPending, error, onSubmit }: CallFormProps) {
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="call-proxy">Proxy URL (optional)</Label>
-        <Input
+        <VariableInput
           id="call-proxy"
           value={proxyUrl}
-          onChange={(event) => setProxyUrl(event.target.value)}
+          onChange={setProxyUrl}
+          variables={variables}
           maxLength={2048}
         />
       </div>
@@ -270,30 +338,28 @@ function CallForm({ call, isPending, error, onSubmit }: CallFormProps) {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="call-headers">Headers (JSON, optional)</Label>
-        <Textarea
-          id="call-headers"
-          value={headers}
-          onChange={(event) => setHeaders(event.target.value)}
-          className="font-mono"
-          placeholder='{ "Content-Type": "application/json" }'
+        <Label>Headers</Label>
+        <KeyValueEditor
+          pairs={headers}
+          onChange={setHeaders}
+          variables={variables}
+          keyPlaceholder="Header"
+          valuePlaceholder="Value"
         />
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="call-query">Query (JSON, optional)</Label>
-        <Textarea
-          id="call-query"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          className="font-mono"
-          placeholder='{ "page": "1" }'
+        <Label>Query</Label>
+        <KeyValueEditor
+          pairs={query}
+          onChange={setQuery}
+          variables={variables}
+          keyPlaceholder="Param"
+          valuePlaceholder="Value"
         />
       </div>
 
-      {(formError ?? error) && (
-        <p className="text-destructive">{formError ?? error}</p>
-      )}
+      {error && <p className="text-destructive">{error}</p>}
 
       <SheetFooter className="px-0">
         <Button type="submit" disabled={isPending}>
