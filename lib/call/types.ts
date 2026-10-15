@@ -9,10 +9,12 @@ export type CallMethod =
 
 export type CallIpVersion = "any" | "ipv4" | "ipv6"
 
+/** Shape of `extractions` on POST/PUT /calls (not the variables API). */
 export interface CallExtraction {
   name: string
   source: "json" | "header" | "status" | "regex"
   expression?: string
+  secret?: boolean
 }
 
 export interface CallRule {

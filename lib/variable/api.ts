@@ -10,6 +10,7 @@ import {
   StaticVariable,
   StaticVariableCreateInput,
   StaticVariableUpdateInput,
+  toCallVariableBody,
 } from "./types"
 
 async function request<T>(
@@ -117,6 +118,7 @@ export const getCallVariable = (
     "Failed to get variable"
   )
 
+/** POST /api/workflows/:id/calls/:callId/variables → 201 */
 export const createCallVariable = (
   workflowId: string,
   callId: string,
@@ -125,9 +127,10 @@ export const createCallVariable = (
   request<CallVariable>(
     callVariablesUrl(workflowId, callId),
     "Failed to create variable",
-    { method: "POST", body: input }
+    { method: "POST", body: toCallVariableBody(input) }
   )
 
+/** PUT /api/workflows/:id/calls/:callId/variables/:name → 200 */
 export const updateCallVariable = (
   workflowId: string,
   callId: string,
@@ -137,7 +140,7 @@ export const updateCallVariable = (
   request<CallVariable>(
     `${callVariablesUrl(workflowId, callId)}/${encodeURIComponent(name)}`,
     "Failed to update variable",
-    { method: "PUT", body: input }
+    { method: "PUT", body: toCallVariableBody(input) }
   )
 
 export const deleteCallVariable = (

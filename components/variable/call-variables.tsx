@@ -168,12 +168,10 @@ export function DraftCallVariables({
     path: string,
     secret: boolean
   ) => {
-    const input: CallVariableCreateInput = {
-      name,
-      source,
-      path: source === "status" ? undefined : path,
-      secret,
-    }
+    const input: CallVariableCreateInput =
+      source === "status"
+        ? { name, secret: secret || undefined }
+        : { name, source, path, secret: secret || undefined }
 
     const duplicate = drafts.some(
       (draft, index) =>
@@ -350,15 +348,20 @@ function CallVariableDrawer({
     path: string,
     secret: boolean
   ) => {
-    const input = {
-      source,
-      path: source === "status" ? undefined : path,
-      secret,
-    }
     if (variableName) {
-      await updateMutation.mutateAsync({ name: variableName, input })
+      await updateMutation.mutateAsync({
+        name: variableName,
+        input:
+          source === "status"
+            ? { secret: secret || undefined }
+            : { source, path, secret: secret || undefined },
+      })
     } else {
-      await createMutation.mutateAsync({ name, ...input })
+      await createMutation.mutateAsync(
+        source === "status"
+          ? { name, secret: secret || undefined }
+          : { name, source, path, secret: secret || undefined }
+      )
     }
     handleOpenChange(false)
   }
