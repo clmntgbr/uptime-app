@@ -72,16 +72,14 @@ export function CallDrawer({
   const callQuery = useCall(workflowId, open ? callId : null)
   const createMutation = useCreateCall(workflowId)
   const updateMutation = useUpdateCall(workflowId)
-  const [draftVariables, setDraftVariables] = useState<CallVariableCreateInput[]>(
-    []
-  )
+  const [draftVariables, setDraftVariables] = useState<
+    CallVariableCreateInput[]
+  >([])
   const [isCreatingVariables, setIsCreatingVariables] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
   const isPending =
-    createMutation.isPending ||
-    updateMutation.isPending ||
-    isCreatingVariables
+    createMutation.isPending || updateMutation.isPending || isCreatingVariables
 
   const handleSubmit = async (input: CallInput) => {
     setCreateError(null)
@@ -150,7 +148,11 @@ export function CallDrawer({
               callId={callId}
               call={isEdit ? callQuery.data : undefined}
               isPending={isPending}
-              error={createError ?? (isEdit ? updateMutation : createMutation).error?.message ?? null}
+              error={
+                createError ??
+                (isEdit ? updateMutation : createMutation).error?.message ??
+                null
+              }
               onSubmit={handleSubmit}
             />
             <div className="flex flex-col gap-4 border-t p-4">
