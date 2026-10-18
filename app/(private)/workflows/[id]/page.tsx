@@ -6,25 +6,12 @@ import { Button } from "@/components/ui/button"
 import { StaticVariables } from "@/components/variable/static-variables"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { ApiError } from "@/lib/api-error"
+import { useDashboardStats } from "@/lib/stats/hooks"
 import { useRunWorkflow, useWorkflow } from "@/lib/workflow/hooks"
-import { Workflow } from "@/lib/workflow/types"
 import { ArrowLeftIcon, SettingsIcon } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState } from "react"
-
-function formatSchedule(workflow: Workflow) {
-  switch (workflow.scheduleType) {
-    case "interval":
-      return `Every ${workflow.intervalSeconds}s`
-    case "once":
-      return "Once, at the next minute"
-    case "at":
-      return workflow.runAt
-        ? `Once, at ${new Date(workflow.runAt).toLocaleString()}`
-        : "Once, at a given date"
-  }
-}
 
 function formatRunError(error: Error) {
   return error instanceof ApiError && error.code === "RUN_IN_PROGRESS"
@@ -37,6 +24,7 @@ export default function WorkflowPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   const workflowQuery = useWorkflow(id)
+  const statsQuery = useDashboardStats(id)
   const runMutation = useRunWorkflow()
 
   if (workflowQuery.isLoading) {
@@ -61,6 +49,7 @@ export default function WorkflowPage() {
   }
 
   const workflow = workflowQuery.data
+  const isRunning = (statsQuery.data?.runs.running ?? 0) > 0
 
   return (
     <div className="flex flex-col">
@@ -73,7 +62,7 @@ export default function WorkflowPage() {
           >
             <ArrowLeftIcon className="size-4" />
           </Link>
-          <div className="flex min-w-0 items-center gap-1">
+          <div className="flex min-w-0 flex-1 items-center gap-1">
             <h1 className="truncate text-sm font-medium">{workflow.name}</h1>
             <Button
               type="button"
@@ -86,43 +75,46 @@ export default function WorkflowPage() {
               <SettingsIcon className="size-4" />
             </Button>
           </div>
+          {isRunning ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="ms-auto shrink-0"
+              disabled
+              title="Stop is not available yet"
+            >
+              Stop
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              className="ms-auto shrink-0"
+              disabled={runMutation.isPending}
+              onClick={() => runMutation.mutate(workflow.id)}
+            >
+              {runMutation.isPending ? "Starting…" : "Run"}
+            </Button>
+          )}
         </div>
       </div>
 
       <div className="flex flex-col gap-4 pt-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-muted-foreground">
-          {formatSchedule(workflow)} ·{" "}
-          {workflow.enabled ? "Enabled" : "Disabled"}
-        </p>
-        <Button
-          disabled={runMutation.isPending}
-          onClick={() => runMutation.mutate(workflow.id)}
-        >
-          {runMutation.isPending ? "Starting…" : "Run"}
-        </Button>
-      </div>
+        {runMutation.error && (
+          <p className="text-destructive">
+            {formatRunError(runMutation.error)}
+          </p>
+        )}
 
-      {runMutation.isSuccess && (
-        <p className="text-muted-foreground">
-          Run started ({runMutation.data.runId}).
-        </p>
-      )}
-      {runMutation.error && (
-        <p className="text-destructive">{formatRunError(runMutation.error)}</p>
-      )}
-
-      <DashboardStats workflowId={workflow.id} />
-
-      <CallList workflowId={workflow.id} />
-
-      <StaticVariables workflowId={workflow.id} />
-
-      <WorkflowDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        workflowId={workflow.id}
-      />
+        <DashboardStats workflowId={workflow.id} />
+        <CallList workflowId={workflow.id} />
+        <StaticVariables workflowId={workflow.id} />
+        <WorkflowDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          workflowId={workflow.id}
+        />
       </div>
     </div>
   )

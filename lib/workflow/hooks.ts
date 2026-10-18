@@ -68,10 +68,13 @@ export function useRunWorkflow() {
   return useMutation({
     mutationFn: (id: string) => runWorkflow(id),
     onSuccess: (_data, id) =>
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.workflows.detail(id),
-        exact: true,
-      }),
+      Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.workflows.detail(id),
+          exact: true,
+        }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.stats.all }),
+      ]),
   })
 }
 
