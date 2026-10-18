@@ -1,5 +1,6 @@
 "use client"
 
+import { DashboardStats } from "@/components/stats/dashboard-stats"
 import { Button } from "@/components/ui/button"
 import { GlobalVariables } from "@/components/variable/global-variables"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
@@ -40,7 +41,9 @@ export default function Page() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 py-4">
+      <DashboardStats />
+
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold">Workflows</h1>
         <Button onClick={openCreate}>New workflow</Button>

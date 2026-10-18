@@ -6,6 +6,10 @@ export const queryKeys = {
     me: ["user", "me"] as const,
   },
 
+  stats: {
+    dashboard: ["stats", "dashboard"] as const,
+  },
+
   workflows: {
     all: ["workflows"] as const,
     lists: () => [...queryKeys.workflows.all, "list"] as const,

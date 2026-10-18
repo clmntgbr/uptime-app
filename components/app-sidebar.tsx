@@ -14,7 +14,8 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
-import { GalleryVerticalEndIcon } from "lucide-react"
+import { GalleryVerticalEndIcon, Mail, PlusCircleIcon } from "lucide-react"
+import { Button } from "./ui/button"
 
 // This is sample data.
 const data = {
@@ -176,6 +177,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+        <SidebarMenuItem className="flex items-center gap-2">
+          <SidebarMenuButton
+            tooltip="Quick Create"
+            className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
+          >
+            <PlusCircleIcon className="size-4" />
+            <span>Quick Create</span>
+          </SidebarMenuButton>
+          <Button
+            size="icon"
+            className="size-8 group-data-[collapsible=icon]:opacity-0"
+            variant="outline"
+          >
+            <Mail />
+            <span className="sr-only">Inbox</span>
+          </Button>
+        </SidebarMenuItem>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
