@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell"
+import { UserCentrifugeListener } from "@/lib/centrifugo/user-centrifuge-listener"
 import { cookies } from "next/headers"
 
 /** Must match `SIDEBAR_COOKIE_NAME` in `components/ui/sidebar.tsx`. */
@@ -13,5 +14,10 @@ export default async function PrivateLayout({
   const defaultSidebarOpen =
     cookieStore.get(SIDEBAR_COOKIE_NAME)?.value !== "false"
 
-  return <AppShell defaultSidebarOpen={defaultSidebarOpen}>{children}</AppShell>
+  return (
+    <>
+      <UserCentrifugeListener />
+      <AppShell defaultSidebarOpen={defaultSidebarOpen}>{children}</AppShell>
+    </>
+  )
 }
