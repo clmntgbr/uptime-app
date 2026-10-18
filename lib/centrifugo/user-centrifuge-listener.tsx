@@ -21,7 +21,7 @@ export function UserCentrifugeListener() {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       void queryClient.invalidateQueries({
-        queryKey: queryKeys.stats.dashboard,
+        queryKey: queryKeys.stats.all,
       })
     }, STATS_DEBOUNCE_MS)
   }, [queryClient])

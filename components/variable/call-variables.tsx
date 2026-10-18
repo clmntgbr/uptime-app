@@ -1,12 +1,12 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Sheet,
   SheetContent,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -270,6 +270,15 @@ export function DraftCallVariables({
               isPending={false}
               error={formError}
               onSubmit={handleSubmit}
+              onCancel={() => setDrawerOpen(false)}
+              onDelete={
+                editedIndex === null
+                  ? undefined
+                  : () => {
+                      handleDelete(editedIndex)
+                      setDrawerOpen(false)
+                    }
+              }
             />
           )}
         </SheetContent>
@@ -332,6 +341,7 @@ function CallVariableDrawer({
   )
   const createMutation = useCreateCallVariable(workflowId, callId)
   const updateMutation = useUpdateCallVariable(workflowId, callId)
+  const deleteMutation = useDeleteCallVariable(workflowId, callId)
 
   const mutation = isEdit ? updateMutation : createMutation
 
@@ -339,6 +349,7 @@ function CallVariableDrawer({
     if (!next) {
       createMutation.reset()
       updateMutation.reset()
+      deleteMutation.reset()
     }
     onOpenChange(next)
   }
@@ -367,6 +378,13 @@ function CallVariableDrawer({
     handleOpenChange(false)
   }
 
+  const handleDelete = async () => {
+    if (!variableName) return
+    if (!window.confirm(`Delete variable "${variableName}"?`)) return
+    await deleteMutation.mutateAsync(variableName)
+    handleOpenChange(false)
+  }
+
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
@@ -387,8 +405,13 @@ function CallVariableDrawer({
             callId={callId}
             variable={isEdit ? variableQuery.data : undefined}
             isPending={mutation.isPending}
-            error={mutation.error?.message ?? null}
+            isDeleting={deleteMutation.isPending}
+            error={
+              mutation.error?.message ?? deleteMutation.error?.message ?? null
+            }
             onSubmit={handleSubmit}
+            onCancel={() => handleOpenChange(false)}
+            onDelete={isEdit ? handleDelete : undefined}
           />
         ) : null}
       </SheetContent>
@@ -402,6 +425,7 @@ interface CallVariableFormProps {
   callId: string | null
   variable?: CallVariable
   isPending: boolean
+  isDeleting?: boolean
   error: string | null
   onSubmit: (
     name: string,
@@ -409,6 +433,8 @@ interface CallVariableFormProps {
     path: string,
     secret: boolean
   ) => Promise<void>
+  onCancel: () => void
+  onDelete?: () => void
 }
 
 /** Response keys are dotted paths; JSONPath expressions must start with `$`. */
@@ -421,8 +447,11 @@ function CallVariableForm({
   callId,
   variable,
   isPending,
+  isDeleting = false,
   error,
   onSubmit,
+  onCancel,
+  onDelete,
 }: CallVariableFormProps) {
   const [name, setName] = useState(variable?.name ?? "")
   const [source, setSource] = useState<CallVariableSource>(
@@ -561,11 +590,14 @@ function CallVariableForm({
 
       {error && <p className="text-destructive">{error}</p>}
 
-      <SheetFooter className="px-0">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : variable ? "Save" : "Create"}
-        </Button>
-      </SheetFooter>
+      <DrawerFormActions
+        isEdit={Boolean(variable)}
+        isPending={isPending}
+        isDeleting={isDeleting}
+        submitLabel={variable ? "Save" : "Create"}
+        onCancel={onCancel}
+        onDelete={onDelete}
+      />
     </form>
   )
 }

@@ -7,7 +7,9 @@ export const queryKeys = {
   },
 
   stats: {
-    dashboard: ["stats", "dashboard"] as const,
+    all: ["statistics"] as const,
+    dashboard: (workflowId?: string) =>
+      [...queryKeys.stats.all, "dashboard", workflowId ?? "all"] as const,
   },
 
   workflows: {

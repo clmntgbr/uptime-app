@@ -42,7 +42,7 @@ export interface CallCounts {
   daily: CallDayCounts[]
 }
 
-/** GET /api/stats — 24h counters + runs/calls daily (~6 months UTC). */
+/** GET /api/statistics — 24h counters + runs/calls daily (~6 months UTC). */
 export interface DashboardStats {
   windowHours: number
   workflows: WorkflowCounts

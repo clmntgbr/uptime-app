@@ -103,8 +103,12 @@ function StatCard({
   )
 }
 
-export function DashboardStats() {
-  const statsQuery = useDashboardStats()
+export function DashboardStats({
+  workflowId,
+}: {
+  workflowId?: string
+} = {}) {
+  const statsQuery = useDashboardStats(workflowId)
 
   if (statsQuery.isLoading) {
     return <p className="text-muted-foreground">Loading stats…</p>
@@ -125,6 +129,7 @@ export function DashboardStats() {
   const callsFailedToday = callsToday.failed + callsToday.error
   const todayRate =
     runsToday.total > 0 ? runsToday.success / runsToday.total : 0
+  const scoped = Boolean(workflowId)
 
   return (
     <div className="flex flex-col gap-4">
@@ -134,22 +139,31 @@ export function DashboardStats() {
           value={formatRate(todayRate)}
           badge="Today"
         />
-        <StatCard description="Active Workflows" value={workflows.active} />
+        {!scoped && (
+          <StatCard description="Active Workflows" value={workflows.active} />
+        )}
         <StatCard
           description="Workflow Runs"
           value={runsToday.total}
           badge="Today"
         />
         <StatCard
-          description="Workflow Successful Runs"
+          description="Successful Runs"
           value={runsToday.success}
           badge={formatRate(todayRate)}
         />
         <StatCard
-          description="Workflow Error Runs"
+          description="Failed Runs"
           value={runsFailedToday}
           badge={formatRate(1 - todayRate)}
         />
+        {scoped && (
+          <StatCard
+            description="Running"
+            value={runsToday.running}
+            badge="Today"
+          />
+        )}
         <StatCard description="Calls" value={callsToday.total} badge="Today" />
         <StatCard
           description="Successful Calls"

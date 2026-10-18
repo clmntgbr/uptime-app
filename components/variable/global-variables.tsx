@@ -1,12 +1,12 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Sheet,
   SheetContent,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -133,6 +133,7 @@ function GlobalVariableDrawer({
   const variableQuery = useGlobalVariable(open ? variableId : null)
   const createMutation = useCreateGlobalVariable()
   const updateMutation = useUpdateGlobalVariable()
+  const deleteMutation = useDeleteGlobalVariable()
 
   const mutation = isEdit ? updateMutation : createMutation
 
@@ -140,6 +141,7 @@ function GlobalVariableDrawer({
     if (!next) {
       createMutation.reset()
       updateMutation.reset()
+      deleteMutation.reset()
     }
     onOpenChange(next)
   }
@@ -153,6 +155,13 @@ function GlobalVariableDrawer({
     } else {
       await createMutation.mutateAsync({ name, value, secret })
     }
+    handleOpenChange(false)
+  }
+
+  const handleDelete = async () => {
+    if (!variableId || !variableQuery.data) return
+    if (!window.confirm(`Delete variable "${variableQuery.data.name}"?`)) return
+    await deleteMutation.mutateAsync(variableId)
     handleOpenChange(false)
   }
 
@@ -174,8 +183,16 @@ function GlobalVariableDrawer({
             key={variableQuery.data?.id ?? "new"}
             variable={isEdit ? variableQuery.data : undefined}
             isPending={mutation.isPending}
-            error={mutation.error?.message ?? null}
+            isDeleting={deleteMutation.isPending}
+            error={
+              mutation.error?.message ??
+              (deleteMutation.error
+                ? formatDeleteError(deleteMutation.error)
+                : null)
+            }
             onSubmit={handleSubmit}
+            onCancel={() => handleOpenChange(false)}
+            onDelete={isEdit ? handleDelete : undefined}
           />
         ) : null}
       </SheetContent>
@@ -186,15 +203,21 @@ function GlobalVariableDrawer({
 interface GlobalVariableFormProps {
   variable?: GlobalVariable
   isPending: boolean
+  isDeleting?: boolean
   error: string | null
   onSubmit: (name: string, value: string, secret: boolean) => Promise<void>
+  onCancel: () => void
+  onDelete?: () => void
 }
 
 function GlobalVariableForm({
   variable,
   isPending,
+  isDeleting = false,
   error,
   onSubmit,
+  onCancel,
+  onDelete,
 }: GlobalVariableFormProps) {
   const [name, setName] = useState(variable?.name ?? "")
   // Secret values come back masked, so they must be re-entered.
@@ -265,11 +288,14 @@ function GlobalVariableForm({
 
       {error && <p className="text-destructive">{error}</p>}
 
-      <SheetFooter className="px-0">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : variable ? "Save" : "Create"}
-        </Button>
-      </SheetFooter>
+      <DrawerFormActions
+        isEdit={Boolean(variable)}
+        isPending={isPending}
+        isDeleting={isDeleting}
+        submitLabel={variable ? "Save" : "Create"}
+        onCancel={onCancel}
+        onDelete={onDelete}
+      />
     </form>
   )
 }

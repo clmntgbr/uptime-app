@@ -6,13 +6,12 @@ import {
   KeyValuePair,
   toRecord,
 } from "@/components/call/key-value-editor"
-import { Button } from "@/components/ui/button"
+import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Sheet,
   SheetContent,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
@@ -24,7 +23,12 @@ import {
   DraftCallVariables,
 } from "@/components/variable/call-variables"
 import { VariableInput } from "@/components/variable/variable-input"
-import { useCall, useCreateCall, useUpdateCall } from "@/lib/call/hooks"
+import {
+  useCall,
+  useCreateCall,
+  useDeleteCall,
+  useUpdateCall,
+} from "@/lib/call/hooks"
 import {
   CallDetail,
   CallInput,
@@ -72,6 +76,7 @@ export function CallDrawer({
   const callQuery = useCall(workflowId, open ? callId : null)
   const createMutation = useCreateCall(workflowId)
   const updateMutation = useUpdateCall(workflowId)
+  const deleteMutation = useDeleteCall(workflowId)
   const [draftVariables, setDraftVariables] = useState<
     CallVariableCreateInput[]
   >([])
@@ -118,10 +123,18 @@ export function CallDrawer({
     onOpenChange(false)
   }
 
+  const handleDelete = async () => {
+    if (!callId || !callQuery.data) return
+    if (!window.confirm(`Delete call "${callQuery.data.name}"?`)) return
+    await deleteMutation.mutateAsync(callId)
+    onOpenChange(false)
+  }
+
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       createMutation.reset()
       updateMutation.reset()
+      deleteMutation.reset()
       setDraftVariables([])
       setCreateError(null)
       setIsCreatingVariables(false)
@@ -148,12 +161,16 @@ export function CallDrawer({
               callId={callId}
               call={isEdit ? callQuery.data : undefined}
               isPending={isPending}
+              isDeleting={deleteMutation.isPending}
               error={
                 createError ??
                 (isEdit ? updateMutation : createMutation).error?.message ??
+                deleteMutation.error?.message ??
                 null
               }
               onSubmit={handleSubmit}
+              onCancel={() => handleOpenChange(false)}
+              onDelete={isEdit ? handleDelete : undefined}
             />
             <div className="flex flex-col gap-4 border-t p-4">
               {callId ? (
@@ -184,8 +201,11 @@ interface CallFormProps {
   callId: string | null
   call?: CallDetail
   isPending: boolean
+  isDeleting?: boolean
   error: string | null
   onSubmit: (input: CallInput) => Promise<void>
+  onCancel: () => void
+  onDelete?: () => void
 }
 
 function CallForm({
@@ -193,8 +213,11 @@ function CallForm({
   callId,
   call,
   isPending,
+  isDeleting = false,
   error,
   onSubmit,
+  onCancel,
+  onDelete,
 }: CallFormProps) {
   const variables = useCallFormVariables(workflowId, callId)
 
@@ -363,11 +386,14 @@ function CallForm({
 
       {error && <p className="text-destructive">{error}</p>}
 
-      <SheetFooter className="px-0">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : call ? "Save" : "Create"}
-        </Button>
-      </SheetFooter>
+      <DrawerFormActions
+        isEdit={Boolean(call)}
+        isPending={isPending}
+        isDeleting={isDeleting}
+        submitLabel={call ? "Save" : "Create"}
+        onCancel={onCancel}
+        onDelete={onDelete}
+      />
     </form>
   )
 }

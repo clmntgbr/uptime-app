@@ -15,7 +15,8 @@ export async function proxyBackend(
     if ("error" in auth) return auth.error
 
     const hasBody = request.method === "POST" || request.method === "PUT"
-    const response = await fetch(`${BACKEND_API_URL}/api${path}`, {
+    const query = new URL(request.url).search
+    const response = await fetch(`${BACKEND_API_URL}/api${path}${query}`, {
       method: request.method,
       headers: createAuthHeaders(auth.token),
       body: hasBody ? await request.text() : undefined,

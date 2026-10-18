@@ -1,18 +1,18 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
+import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
   Sheet,
   SheetContent,
-  SheetFooter,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import {
   useCreateWorkflow,
+  useDeleteWorkflow,
   useUpdateWorkflow,
   useWorkflow,
 } from "@/lib/workflow/hooks"
@@ -21,6 +21,7 @@ import {
   WorkflowInput,
   WorkflowScheduleType,
 } from "@/lib/workflow/types"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 interface WorkflowDrawerProps {
@@ -35,10 +36,12 @@ export function WorkflowDrawer({
   onOpenChange,
   workflowId,
 }: WorkflowDrawerProps) {
+  const router = useRouter()
   const isEdit = workflowId !== null
   const workflowQuery = useWorkflow(open ? workflowId : null)
   const createMutation = useCreateWorkflow()
   const updateMutation = useUpdateWorkflow()
+  const deleteMutation = useDeleteWorkflow()
 
   const mutation = isEdit ? updateMutation : createMutation
 
@@ -51,10 +54,19 @@ export function WorkflowDrawer({
     onOpenChange(false)
   }
 
+  const handleDelete = async () => {
+    if (!workflowId || !workflowQuery.data) return
+    if (!window.confirm(`Delete workflow "${workflowQuery.data.name}"?`)) return
+    await deleteMutation.mutateAsync(workflowId)
+    onOpenChange(false)
+    router.push("/")
+  }
+
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       createMutation.reset()
       updateMutation.reset()
+      deleteMutation.reset()
     }
     onOpenChange(next)
   }
@@ -75,8 +87,13 @@ export function WorkflowDrawer({
             key={workflowQuery.data?.id ?? "new"}
             workflow={isEdit ? workflowQuery.data : undefined}
             isPending={mutation.isPending}
-            error={mutation.error?.message ?? null}
+            isDeleting={deleteMutation.isPending}
+            error={
+              mutation.error?.message ?? deleteMutation.error?.message ?? null
+            }
             onSubmit={handleSubmit}
+            onCancel={() => handleOpenChange(false)}
+            onDelete={isEdit ? handleDelete : undefined}
           />
         ) : null}
       </SheetContent>
@@ -87,8 +104,11 @@ export function WorkflowDrawer({
 interface WorkflowFormProps {
   workflow?: Workflow
   isPending: boolean
+  isDeleting?: boolean
   error: string | null
   onSubmit: (input: WorkflowInput) => Promise<void>
+  onCancel: () => void
+  onDelete?: () => void
 }
 
 const SCHEDULE_TYPES: { value: WorkflowScheduleType; label: string }[] = [
@@ -108,8 +128,11 @@ function toDateTimeLocal(iso?: string): string {
 function WorkflowForm({
   workflow,
   isPending,
+  isDeleting = false,
   error,
   onSubmit,
+  onCancel,
+  onDelete,
 }: WorkflowFormProps) {
   const [name, setName] = useState(workflow?.name ?? "")
   const [scheduleType, setScheduleType] = useState<WorkflowScheduleType>(
@@ -209,11 +232,14 @@ function WorkflowForm({
 
       {error && <p className="text-destructive">{error}</p>}
 
-      <SheetFooter className="px-0">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? "Saving…" : workflow ? "Save" : "Create"}
-        </Button>
-      </SheetFooter>
+      <DrawerFormActions
+        isEdit={Boolean(workflow)}
+        isPending={isPending}
+        isDeleting={isDeleting}
+        submitLabel={workflow ? "Save" : "Create"}
+        onCancel={onCancel}
+        onDelete={onDelete}
+      />
     </form>
   )
 }

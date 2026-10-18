@@ -1,18 +1,16 @@
 "use client"
 
 import { CallList } from "@/components/call/call-list"
+import { DashboardStats } from "@/components/stats/dashboard-stats"
 import { Button } from "@/components/ui/button"
 import { StaticVariables } from "@/components/variable/static-variables"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { ApiError } from "@/lib/api-error"
-import {
-  useDeleteWorkflow,
-  useRunWorkflow,
-  useWorkflow,
-} from "@/lib/workflow/hooks"
+import { useRunWorkflow, useWorkflow } from "@/lib/workflow/hooks"
 import { Workflow } from "@/lib/workflow/types"
+import { ArrowLeftIcon, SettingsIcon } from "lucide-react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useState } from "react"
 
 function formatSchedule(workflow: Workflow) {
@@ -36,20 +34,10 @@ function formatRunError(error: Error) {
 
 export default function WorkflowPage() {
   const { id } = useParams<{ id: string }>()
-  const router = useRouter()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   const workflowQuery = useWorkflow(id)
-  const deleteMutation = useDeleteWorkflow()
   const runMutation = useRunWorkflow()
-
-  const handleDelete = () => {
-    const workflow = workflowQuery.data
-    if (!workflow || !window.confirm(`Delete workflow "${workflow.name}"?`)) {
-      return
-    }
-    deleteMutation.mutate(workflow.id, { onSuccess: () => router.push("/") })
-  }
 
   if (workflowQuery.isLoading) {
     return <p className="text-muted-foreground">Loading…</p>
@@ -57,12 +45,16 @@ export default function WorkflowPage() {
 
   if (workflowQuery.error || !workflowQuery.data) {
     return (
-      <div className="flex flex-col items-start gap-2">
+      <div className="flex flex-col items-start gap-2 pt-4">
         <p className="text-destructive">
           {workflowQuery.error?.message ?? "Workflow not found"}
         </p>
-        <Link href="/" className="hover:underline">
-          ← Back to workflows
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeftIcon className="size-4" />
+          Back to dashboard
         </Link>
       </div>
     )
@@ -71,37 +63,44 @@ export default function WorkflowPage() {
   const workflow = workflowQuery.data
 
   return (
-    <div className="flex flex-col gap-4">
-      <Link href="/" className="text-muted-foreground hover:underline">
-        ← Back to workflows
-      </Link>
+    <div className="flex flex-col">
+      <div className="sticky top-16 z-10 -mx-4 border-b bg-background px-4">
+        <div className="flex h-12 items-center gap-2">
+          <Link
+            href="/"
+            aria-label="Back to dashboard"
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <ArrowLeftIcon className="size-4" />
+          </Link>
+          <div className="flex min-w-0 items-center gap-1">
+            <h1 className="truncate text-sm font-medium">{workflow.name}</h1>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0"
+              aria-label="Edit workflow"
+              onClick={() => setDrawerOpen(true)}
+            >
+              <SettingsIcon className="size-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
 
+      <div className="flex flex-col gap-4 pt-4">
       <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold">{workflow.name}</h1>
-          <p className="text-muted-foreground">
-            {formatSchedule(workflow)} ·{" "}
-            {workflow.enabled ? "Enabled" : "Disabled"}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            disabled={runMutation.isPending}
-            onClick={() => runMutation.mutate(workflow.id)}
-          >
-            {runMutation.isPending ? "Starting…" : "Run"}
-          </Button>
-          <Button variant="outline" onClick={() => setDrawerOpen(true)}>
-            Edit
-          </Button>
-          <Button
-            variant="destructive"
-            disabled={deleteMutation.isPending}
-            onClick={handleDelete}
-          >
-            Delete
-          </Button>
-        </div>
+        <p className="text-muted-foreground">
+          {formatSchedule(workflow)} ·{" "}
+          {workflow.enabled ? "Enabled" : "Disabled"}
+        </p>
+        <Button
+          disabled={runMutation.isPending}
+          onClick={() => runMutation.mutate(workflow.id)}
+        >
+          {runMutation.isPending ? "Starting…" : "Run"}
+        </Button>
       </div>
 
       {runMutation.isSuccess && (
@@ -112,9 +111,8 @@ export default function WorkflowPage() {
       {runMutation.error && (
         <p className="text-destructive">{formatRunError(runMutation.error)}</p>
       )}
-      {deleteMutation.error && (
-        <p className="text-destructive">{deleteMutation.error.message}</p>
-      )}
+
+      <DashboardStats workflowId={workflow.id} />
 
       <CallList workflowId={workflow.id} />
 
@@ -125,6 +123,7 @@ export default function WorkflowPage() {
         onOpenChange={setDrawerOpen}
         workflowId={workflow.id}
       />
+      </div>
     </div>
   )
 }
