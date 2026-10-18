@@ -1,5 +1,6 @@
 "use client"
 
+import { StatsAreaChart } from "@/components/stats/stats-area-chart"
 import { Badge } from "@/components/ui/badge"
 import {
   Card,
@@ -10,10 +11,44 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { useDashboardStats } from "@/lib/stats/hooks"
+import type { CallDayCounts, RunDayCounts } from "@/lib/stats/types"
 import { IconTrendingDown, IconTrendingUp } from "@tabler/icons-react"
 
 function formatRate(rate: number) {
   return `${(rate * 100).toFixed(rate > 0 && rate < 0.01 ? 1 : 0)}%`
+}
+
+function utcToday(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function todayRuns(daily: RunDayCounts[]): RunDayCounts {
+  const today = utcToday()
+  return (
+    daily.find((day) => day.date === today) ?? {
+      date: today,
+      total: 0,
+      success: 0,
+      failed: 0,
+      error: 0,
+      skipped: 0,
+      running: 0,
+    }
+  )
+}
+
+function todayCalls(daily: CallDayCounts[]): CallDayCounts {
+  const today = utcToday()
+  return (
+    daily.find((day) => day.date === today) ?? {
+      date: today,
+      total: 0,
+      success: 0,
+      failed: 0,
+      error: 0,
+      skipped: 0,
+    }
+  )
 }
 
 function StatCard({
@@ -83,42 +118,54 @@ export function DashboardStats() {
     )
   }
 
-  const { windowHours, workflows, runs, calls, successRate } = statsQuery.data
-  const windowLabel = `${windowHours}h`
+  const { workflows, runs, calls } = statsQuery.data
+  const runsToday = todayRuns(runs.daily ?? [])
+  const callsToday = todayCalls(calls.daily ?? [])
+  const runsFailedToday = runsToday.failed + runsToday.error
+  const callsFailedToday = callsToday.failed + callsToday.error
+  const todayRate =
+    runsToday.total > 0 ? runsToday.success / runsToday.total : 0
 
   return (
-    <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
-      <StatCard
-        description="Success rate"
-        value={formatRate(successRate)}
-        badge={windowLabel}
-      />
-      <StatCard description="Active Workflows" value={workflows.active} />
-      <StatCard
-        description="Workflow Runs"
-        value={runs.total}
-        badge={windowLabel}
-      />
-      <StatCard
-        description="Workflow Successful Runs"
-        value={runs.success}
-        badge={formatRate(successRate)}
-      />
-      <StatCard
-        description="Workflow Error Runs"
-        value={runs.error}
-        badge={formatRate(1 - successRate)}
-      />
-      <StatCard description="Calls" value={calls.total} badge={windowLabel} />
-      <StatCard
-        description="Successful Calls"
-        value={calls.success}
-        badge={windowLabel}
-      />
-      <StatCard
-        description="Failed Calls"
-        value={calls.failed + calls.error}
-        badge={windowLabel}
+    <div className="flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
+        <StatCard
+          description="Success rate"
+          value={formatRate(todayRate)}
+          badge="Today"
+        />
+        <StatCard description="Active Workflows" value={workflows.active} />
+        <StatCard
+          description="Workflow Runs"
+          value={runsToday.total}
+          badge="Today"
+        />
+        <StatCard
+          description="Workflow Successful Runs"
+          value={runsToday.success}
+          badge={formatRate(todayRate)}
+        />
+        <StatCard
+          description="Workflow Error Runs"
+          value={runsFailedToday}
+          badge={formatRate(1 - todayRate)}
+        />
+        <StatCard description="Calls" value={callsToday.total} badge="Today" />
+        <StatCard
+          description="Successful Calls"
+          value={callsToday.success}
+          badge="Today"
+        />
+        <StatCard
+          description="Failed Calls"
+          value={callsFailedToday}
+          badge="Today"
+        />
+      </div>
+
+      <StatsAreaChart
+        runsDaily={runs.daily ?? []}
+        callsDaily={calls.daily ?? []}
       />
     </div>
   )

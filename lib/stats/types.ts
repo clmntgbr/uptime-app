@@ -4,7 +4,8 @@ export interface WorkflowCounts {
   disabled: number
 }
 
-export interface RunCounts {
+export interface RunDayCounts {
+  date: string
   total: number
   success: number
   failed: number
@@ -13,7 +14,18 @@ export interface RunCounts {
   running: number
 }
 
-export interface CallCounts {
+export interface RunCounts {
+  total: number
+  success: number
+  failed: number
+  error: number
+  skipped: number
+  running: number
+  daily: RunDayCounts[]
+}
+
+export interface CallDayCounts {
+  date: string
   total: number
   success: number
   failed: number
@@ -21,7 +33,16 @@ export interface CallCounts {
   skipped: number
 }
 
-/** GET /api/stats — dashboard counters for the last `windowHours`. */
+export interface CallCounts {
+  total: number
+  success: number
+  failed: number
+  error: number
+  skipped: number
+  daily: CallDayCounts[]
+}
+
+/** GET /api/stats — 24h counters + runs/calls daily (~6 months UTC). */
 export interface DashboardStats {
   windowHours: number
   workflows: WorkflowCounts
