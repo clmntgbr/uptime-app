@@ -15,6 +15,8 @@ export interface Workflow {
   /** Only set when `scheduleType` is `at` (RFC 3339, UTC). */
   runAt?: string
   enabled: boolean
+  /** Next scheduled run (RFC 3339); omitted when none / never. */
+  nextRunAt?: string
 }
 
 export interface WorkflowInput {

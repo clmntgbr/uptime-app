@@ -12,6 +12,8 @@ export interface RunDayCounts {
   error: number
   skipped: number
   running: number
+  /** p95 of duration_ms for finished runs that day; null when none. */
+  latencyP95Ms: number | null
 }
 
 export interface RunCounts {
@@ -42,6 +44,12 @@ export interface CallCounts {
   daily: CallDayCounts[]
 }
 
+/** Contiguous failed/error run range. `end` is null while the incident is still open. */
+export interface IncidentRange {
+  start: string
+  end: string | null
+}
+
 /** GET /api/statistics — 24h counters + runs/calls daily (~6 months UTC). */
 export interface DashboardStats {
   windowHours: number
@@ -49,4 +57,7 @@ export interface DashboardStats {
   runs: RunCounts
   calls: CallCounts
   successRate: number
+  latencyP95Ms: number | null
+  openIncident: boolean
+  incidents: IncidentRange[]
 }

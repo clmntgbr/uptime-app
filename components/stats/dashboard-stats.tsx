@@ -1,5 +1,8 @@
 "use client"
 
+import type { ReactNode } from "react"
+import { CircleHelpIcon } from "lucide-react"
+
 import { StatsAreaChart } from "@/components/stats/stats-area-chart"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -10,44 +13,38 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
+import { formatLatencyMs, formatRate } from "@/lib/stats/format"
 import { useDashboardStats } from "@/lib/stats/hooks"
-import type { CallDayCounts, RunDayCounts } from "@/lib/stats/types"
-import { IconTrendingDown, IconTrendingUp } from "@tabler/icons-react"
 
-function formatRate(rate: number) {
-  return `${(rate * 100).toFixed(rate > 0 && rate < 0.01 ? 1 : 0)}%`
-}
-
-function utcToday(): string {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function todayRuns(daily: RunDayCounts[]): RunDayCounts {
-  const today = utcToday()
+function LatencyP95Label() {
   return (
-    daily.find((day) => day.date === today) ?? {
-      date: today,
-      total: 0,
-      success: 0,
-      failed: 0,
-      error: 0,
-      skipped: 0,
-      running: 0,
-    }
-  )
-}
-
-function todayCalls(daily: CallDayCounts[]): CallDayCounts {
-  const today = utcToday()
-  return (
-    daily.find((day) => day.date === today) ?? {
-      date: today,
-      total: 0,
-      success: 0,
-      failed: 0,
-      error: 0,
-      skipped: 0,
-    }
+    <span className="inline-flex items-center gap-1">
+      Latency p95
+      <HoverCard>
+        <HoverCardTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex size-3.5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            aria-label="What is latency p95?"
+          >
+            <CircleHelpIcon className="size-3.5" />
+          </button>
+        </HoverCardTrigger>
+        <HoverCardContent side="top" align="start" className="w-64 space-y-1.5">
+          <p className="font-medium text-foreground">Latency p95</p>
+          <p className="text-muted-foreground">
+            The 95th percentile of finished run durations over the last 24 hours.
+            95% of runs completed at or below this time; the slowest 5% took
+            longer.
+          </p>
+        </HoverCardContent>
+      </HoverCard>
+    </span>
   )
 }
 
@@ -57,17 +54,13 @@ function StatCard({
   badge = null,
   footerTitle = null,
   footerHint = null,
-  trendingUp = null,
 }: {
-  description: string
+  description: ReactNode
   value: string | number
   badge?: string | null
   footerTitle?: string | null
   footerHint?: string | null
-  trendingUp?: boolean | null
 }) {
-  const showTrend = trendingUp != null
-  const TrendIcon = trendingUp === false ? IconTrendingDown : IconTrendingUp
   const showFooter = footerTitle != null || footerHint != null
 
   return (
@@ -79,20 +72,14 @@ function StatCard({
         </CardTitle>
         {badge != null && (
           <CardAction>
-            <Badge variant="outline">
-              {showTrend && <TrendIcon />}
-              {badge}
-            </Badge>
+            <Badge variant="outline">{badge}</Badge>
           </CardAction>
         )}
       </CardHeader>
       {showFooter && (
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
           {footerTitle != null && (
-            <div className="line-clamp-1 flex gap-2 font-medium">
-              {footerTitle}
-              {showTrend && <TrendIcon className="size-4" />}
-            </div>
+            <div className="line-clamp-1 font-medium">{footerTitle}</div>
           )}
           {footerHint != null && (
             <div className="text-muted-foreground">{footerHint}</div>
@@ -122,64 +109,51 @@ export function DashboardStats({
     )
   }
 
-  const { workflows, runs, calls } = statsQuery.data
-  const runsToday = todayRuns(runs.daily ?? [])
-  const callsToday = todayCalls(calls.daily ?? [])
-  const runsFailedToday = runsToday.failed + runsToday.error
-  const callsFailedToday = callsToday.failed + callsToday.error
-  const todayRate =
-    runsToday.total > 0 ? runsToday.success / runsToday.total : 0
-  const scoped = Boolean(workflowId)
+  const { runs, successRate, latencyP95Ms, openIncident } = statsQuery.data
+  const failedRuns = runs.failed + runs.error
+  const running = runs.running
+
+  const runsFooter =
+    running > 0
+      ? `${running} running`
+      : failedRuns > 0
+        ? `${failedRuns} failed`
+        : runs.total > 0
+          ? "No failures"
+          : null
 
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
         <StatCard
-          description="Success rate"
-          value={formatRate(todayRate)}
-          badge="Today"
-        />
-        {!scoped && (
-          <StatCard description="Active Workflows" value={workflows.active} />
-        )}
-        <StatCard
-          description="Workflow Runs"
-          value={runsToday.total}
-          badge="Today"
+          description="Availability"
+          value={runs.total > 0 ? formatRate(successRate) : "—"}
+          badge="24h"
         />
         <StatCard
-          description="Successful Runs"
-          value={runsToday.success}
-          badge={formatRate(todayRate)}
+          description="Runs"
+          value={runs.total}
+          badge="24h"
+          footerTitle={runsFooter}
+          footerHint={
+            running > 0 && failedRuns > 0 ? `${failedRuns} failed` : null
+          }
         />
         <StatCard
-          description="Failed Runs"
-          value={runsFailedToday}
-          badge={formatRate(1 - todayRate)}
-        />
-        {scoped && (
-          <StatCard
-            description="Running"
-            value={runsToday.running}
-            badge="Today"
-          />
-        )}
-        <StatCard description="Calls" value={callsToday.total} badge="Today" />
-        <StatCard
-          description="Successful Calls"
-          value={callsToday.success}
-          badge="Today"
+          description={<LatencyP95Label />}
+          value={formatLatencyMs(latencyP95Ms)}
+          badge="24h"
         />
         <StatCard
-          description="Failed Calls"
-          value={callsFailedToday}
-          badge="Today"
+          description="Open incident"
+          value={openIncident ? "Ongoing" : "None"}
+          badge={openIncident ? "Active" : null}
         />
       </div>
 
       <StatsAreaChart
         runsDaily={runs.daily ?? []}
-        callsDaily={calls.daily ?? []}
+        callsDaily={statsQuery.data.calls.daily ?? []}
       />
     </div>
   )
