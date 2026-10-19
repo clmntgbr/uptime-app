@@ -6,7 +6,10 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
-import { applyWorkflowStarted } from "@/lib/centrifugo/stats-cache"
+import {
+  applyWorkflowStarted,
+  applyWorkflowStopped,
+} from "@/lib/centrifugo/stats-cache"
 import { PaginateParams } from "@/lib/paginate"
 import { queryKeys } from "@/lib/query/keys"
 import {
@@ -15,6 +18,7 @@ import {
   getWorkflow,
   listWorkflows,
   runWorkflow,
+  stopWorkflow,
   updateWorkflow,
 } from "./api"
 import { WorkflowInput } from "./types"
@@ -72,6 +76,35 @@ export function useRunWorkflow() {
       // Optimistic UI only — Centrifugo workflow.started/finished owns the refetch.
       await queryClient.cancelQueries({ queryKey: queryKeys.stats.all })
       applyWorkflowStarted(queryClient, id)
+    },
+  })
+}
+
+export function useStopWorkflow() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => stopWorkflow(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.workflows.detail(id),
+        exact: true,
+      })
+      const previous = queryClient.getQueryData(
+        queryKeys.workflows.detail(id)
+      )
+      applyWorkflowStopped(queryClient, id)
+      return { previous, id }
+    },
+    onError: (_error, id, context) => {
+      if (context?.previous != null) {
+        queryClient.setQueryData(
+          queryKeys.workflows.detail(id),
+          context.previous
+        )
+      } else {
+        applyWorkflowStarted(queryClient, id)
+      }
     },
   })
 }

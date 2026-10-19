@@ -75,6 +75,16 @@ export const runWorkflow = async (id: string): Promise<WorkflowRunResponse> => {
   return response.json()
 }
 
+export const stopWorkflow = async (id: string): Promise<WorkflowRunResponse> => {
+  const response = await fetch(`/api/workflows/${id}/stop`, { method: "POST" })
+
+  if (!response.ok) {
+    throw await parseApiError(response, "Failed to stop workflow")
+  }
+
+  return response.json()
+}
+
 export const deleteWorkflow = async (id: string): Promise<void> => {
   const response = await fetch(`/api/workflows/${id}`, { method: "DELETE" })
 

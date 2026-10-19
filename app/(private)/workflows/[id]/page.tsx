@@ -4,26 +4,34 @@ import { CallList } from "@/components/call/call-list"
 import { DashboardStats } from "@/components/stats/dashboard-stats"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StaticVariables } from "@/components/variable/static-variables"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { ApiError } from "@/lib/api-error"
-import { useDashboardStats } from "@/lib/stats/hooks"
 import {
   useRunWorkflow,
+  useStopWorkflow,
   useUpdateWorkflow,
   useWorkflow,
 } from "@/lib/workflow/hooks"
-import { workflowHealth, type WorkflowHealth } from "@/lib/workflow/status"
 import type { Workflow } from "@/lib/workflow/types"
 import { ArrowLeftIcon, SettingsIcon } from "lucide-react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
-import { useState } from "react"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
+import { useCallback, useState } from "react"
+
+const WORKFLOW_TABS = ["overview", "runs"] as const
+type WorkflowTab = (typeof WORKFLOW_TABS)[number]
+
+function parseWorkflowTab(value: string | null): WorkflowTab {
+  return value === "runs" ? "runs" : "overview"
+}
 
 function formatRunError(error: Error) {
-  return error instanceof ApiError && error.code === "RUN_IN_PROGRESS"
-    ? "A run is already in progress."
-    : error.message
+  if (!(error instanceof ApiError)) return error.message
+  if (error.code === "RUN_IN_PROGRESS") return "A run is already in progress."
+  if (error.code === "NO_RUN_IN_PROGRESS") return "No run is in progress."
+  return error.message
 }
 
 function formatNextRun(nextRunAt: string | undefined) {
@@ -39,14 +47,6 @@ function formatNextRun(nextRunAt: string | undefined) {
   })}`
 }
 
-function healthBadgeVariant(
-  health: WorkflowHealth
-): "secondary" | "destructive" | "outline" {
-  if (health === "failing") return "destructive"
-  if (health === "paused") return "outline"
-  return "secondary"
-}
-
 function workflowInputFrom(workflow: Workflow, enabled: boolean) {
   return {
     name: workflow.name,
@@ -59,11 +59,25 @@ function workflowInputFrom(workflow: Workflow, enabled: boolean) {
 
 export default function WorkflowPage() {
   const { id } = useParams<{ id: string }>()
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const tab = parseWorkflowTab(searchParams.get("tabs"))
+
+  const setTab = useCallback(
+    (next: string) => {
+      const value = parseWorkflowTab(next)
+      const params = new URLSearchParams(searchParams.toString())
+      params.set("tabs", value)
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    },
+    [pathname, router, searchParams]
+  )
 
   const workflowQuery = useWorkflow(id)
-  const statsQuery = useDashboardStats(id)
   const runMutation = useRunWorkflow()
+  const stopMutation = useStopWorkflow()
   const updateMutation = useUpdateWorkflow()
 
   if (workflowQuery.isLoading) {
@@ -89,24 +103,19 @@ export default function WorkflowPage() {
 
   const workflow = workflowQuery.data
   const isRunning = workflow.isRunning
-  const health = workflowHealth({
-    enabled: workflow.enabled,
-    openIncident: statsQuery.data?.openIncident,
-    lastStatus: workflow.lastStatus,
-  })
 
   return (
-    <div className="flex flex-col">
+    <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-0">
       <div className="sticky top-16 z-10 -mx-4 border-b bg-background px-4">
-        <div className="flex h-12 items-center gap-2">
-          <Link
-            href="/"
-            aria-label="Back to dashboard"
-            className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <ArrowLeftIcon className="size-4" />
-          </Link>
-          <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <div className="flex min-w-0 items-center gap-1.5 justify-self-start">
+            <Link
+              href="/"
+              aria-label="Back to dashboard"
+              className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ArrowLeftIcon className="size-4" />
+            </Link>
             <h1 className="truncate text-sm font-medium">{workflow.name}</h1>
             <Button
               type="button"
@@ -119,8 +128,14 @@ export default function WorkflowPage() {
               <SettingsIcon className="size-4" />
             </Button>
           </div>
-          <div className="ms-auto flex shrink-0 items-center gap-3">
-            <span className="hidden text-xs text-muted-foreground md:inline">
+
+          <TabsList className="justify-self-center">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="runs">Runs</TabsTrigger>
+          </TabsList>
+
+          <div className="flex min-w-0 items-center justify-end gap-3 justify-self-end">
+            <span className="hidden truncate text-xs text-muted-foreground md:inline">
               {formatNextRun(workflow.nextRunAt)}
             </span>
             <Switch
@@ -143,10 +158,10 @@ export default function WorkflowPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled
-                title="Stop is not available yet"
+                disabled={stopMutation.isPending}
+                onClick={() => stopMutation.mutate(workflow.id)}
               >
-                Stop
+                {stopMutation.isPending ? "Stopping…" : "Stop"}
               </Button>
             ) : (
               <Button
@@ -162,10 +177,15 @@ export default function WorkflowPage() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 pt-4">
+      <TabsContent value="overview" className="flex flex-col gap-4 pt-4 text-sm">
         {runMutation.error && (
           <p className="text-destructive">
             {formatRunError(runMutation.error)}
+          </p>
+        )}
+        {stopMutation.error && (
+          <p className="text-destructive">
+            {formatRunError(stopMutation.error)}
           </p>
         )}
         {updateMutation.error && (
@@ -180,12 +200,15 @@ export default function WorkflowPage() {
         />
         <CallList workflowId={workflow.id} />
         <StaticVariables workflowId={workflow.id} />
-        <WorkflowDrawer
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-          workflowId={workflow.id}
-        />
-      </div>
-    </div>
+      </TabsContent>
+
+      <TabsContent value="runs" className="pt-4 text-sm" />
+
+      <WorkflowDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        workflowId={workflow.id}
+      />
+    </Tabs>
   )
 }

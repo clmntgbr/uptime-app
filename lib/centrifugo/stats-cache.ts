@@ -35,6 +35,35 @@ export function applyWorkflowStarted(
   }
 }
 
+/** Clear running so Stop → Run switches immediately. */
+export function applyWorkflowStopped(
+  queryClient: QueryClient,
+  workflowId: string | undefined
+) {
+  const keys = [queryKeys.stats.dashboard()]
+  if (workflowId) keys.push(queryKeys.stats.dashboard(workflowId))
+
+  for (const queryKey of keys) {
+    queryClient.setQueryData<DashboardStats>(queryKey, (old) => {
+      if (!old || old.runs.running <= 0) return old
+      return {
+        ...old,
+        runs: {
+          ...old.runs,
+          running: 0,
+        },
+      }
+    })
+  }
+
+  if (workflowId) {
+    queryClient.setQueryData<Workflow>(
+      queryKeys.workflows.detail(workflowId),
+      (old) => (old ? { ...old, isRunning: false } : old)
+    )
+  }
+}
+
 /**
  * Refetch statistics once. Does not touch workflow detail (that would cascade
  * into calls / variables because their keys are nested under it).

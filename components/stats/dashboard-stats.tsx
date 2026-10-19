@@ -21,10 +21,9 @@ import {
 import {
   formatLatencyMs,
   formatRate,
-  formatRelativeTime,
   formatRunStatusLabel,
 } from "@/lib/stats/format"
-import { useDashboardStats } from "@/lib/stats/hooks"
+import { useDashboardStats, useRelativeTime } from "@/lib/stats/hooks"
 import type { IncidentRange } from "@/lib/stats/types"
 
 function LatencyP95Label() {
@@ -111,29 +110,39 @@ function lastRunBadgeVariant(
   return "outline"
 }
 
-function IncidentBanner({
+function LastRunStatCard({
+  isRunning,
+  lastRunAt,
+  lastStatus,
   openIncident,
   incidents,
 }: {
+  isRunning: boolean
+  lastRunAt?: string
+  lastStatus?: string
   openIncident: boolean
   incidents: IncidentRange[]
 }) {
-  if (!openIncident) return null
-
-  const startedAt = openIncidentStartedAt(incidents)
-  const since = startedAt ? formatRelativeTime(startedAt) : null
+  const resolvedStatus = isRunning
+    ? "running"
+    : (lastStatus ?? (openIncident ? "failed" : undefined))
+  const resolvedAt =
+    lastRunAt ?? (openIncident ? openIncidentStartedAt(incidents) : undefined)
+  const lastRunRelative = useRelativeTime(isRunning ? null : resolvedAt)
 
   return (
-    <div
-      role="status"
-      className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm"
-    >
-      <Badge variant="destructive">Incident</Badge>
-      <span className="font-medium text-destructive">Ongoing outage</span>
-      {since != null && since !== "—" && (
-        <span className="text-muted-foreground">Started {since}</span>
-      )}
-    </div>
+    <StatCard
+      description="Last run"
+      value={
+        isRunning
+          ? formatRunStatusLabel("running")
+          : resolvedAt || resolvedStatus
+            ? lastRunRelative
+            : "—"
+      }
+      badge={isRunning ? null : formatRunStatusLabel(resolvedStatus)}
+      badgeVariant={lastRunBadgeVariant(resolvedStatus)}
+    />
   )
 }
 
@@ -177,17 +186,8 @@ export function DashboardStats({
       runs.total
     )
 
-  const resolvedStatus = isRunning
-    ? "running"
-    : (lastStatus ?? (openIncident ? "failed" : undefined))
-  const resolvedAt =
-    lastRunAt ??
-    (openIncident ? openIncidentStartedAt(incidents ?? []) : undefined)
-
   return (
     <div className="flex flex-col gap-4">
-      <IncidentBanner openIncident={openIncident} incidents={incidents ?? []} />
-
       <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
         <StatCard
           description="Availability"
@@ -200,17 +200,12 @@ export function DashboardStats({
           value={formatLatencyMs(latencyP95Ms)}
           badge="24h"
         />
-        <StatCard
-          description="Last run"
-          value={
-            isRunning
-              ? formatRunStatusLabel("running")
-              : resolvedAt || resolvedStatus
-                ? formatRelativeTime(resolvedAt)
-                : "—"
-          }
-          badge={isRunning ? null : formatRunStatusLabel(resolvedStatus)}
-          badgeVariant={lastRunBadgeVariant(resolvedStatus)}
+        <LastRunStatCard
+          isRunning={isRunning}
+          lastRunAt={lastRunAt}
+          lastStatus={lastStatus}
+          openIncident={openIncident}
+          incidents={incidents ?? []}
         />
       </div>
 
