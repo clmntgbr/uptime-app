@@ -7,6 +7,7 @@ import {
   applyWorkflowStarted,
   refetchStatistics,
   refetchWorkflowDetail,
+  refetchWorkflowRuns,
 } from "./stats-cache"
 import {
   eventTypeEquals,
@@ -43,15 +44,19 @@ export function UserCentrifugeListener() {
         if (startedTimeoutRef.current) clearTimeout(startedTimeoutRef.current)
         startedTimeoutRef.current = setTimeout(() => {
           void refetchStatistics(queryClient)
+          if (event.workflowId) {
+            void refetchWorkflowRuns(queryClient, event.workflowId)
+          }
         }, STARTED_REFETCH_MS)
         return
       }
 
-      // workflow.finished — one stats pull + exact workflow detail (last run).
+      // workflow.finished — stats + workflow detail + runs list.
       if (startedTimeoutRef.current) clearTimeout(startedTimeoutRef.current)
       void refetchStatistics(queryClient)
       if (event.workflowId) {
         void refetchWorkflowDetail(queryClient, event.workflowId)
+        void refetchWorkflowRuns(queryClient, event.workflowId)
       }
     },
     [queryClient]
@@ -59,6 +64,10 @@ export function UserCentrifugeListener() {
 
   const onReconnected = useCallback(() => {
     void refetchStatistics(queryClient)
+    void queryClient.invalidateQueries({
+      predicate: (query) =>
+        query.queryKey[0] === "runs" && query.queryKey[2] === "list",
+    })
   }, [queryClient])
 
   useCentrifuge(user?.id ?? null, handlePublication, onReconnected)

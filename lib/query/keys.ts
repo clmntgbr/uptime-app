@@ -29,6 +29,17 @@ export const queryKeys = {
       [...queryKeys.calls.all(workflowId), callId] as const,
   },
 
+  /** Separate root so exact workflow-detail invalidation does not cascade. */
+  runs: {
+    all: (workflowId: string) => ["runs", workflowId] as const,
+    lists: (workflowId: string) =>
+      [...queryKeys.runs.all(workflowId), "list"] as const,
+    list: (workflowId: string, params?: PaginateParams) =>
+      [...queryKeys.runs.lists(workflowId), params ?? {}] as const,
+    detail: (workflowId: string, runId: string) =>
+      [...queryKeys.runs.all(workflowId), runId] as const,
+  },
+
   globalVariables: {
     all: ["global-variables"] as const,
     list: () => [...queryKeys.globalVariables.all, "list"] as const,

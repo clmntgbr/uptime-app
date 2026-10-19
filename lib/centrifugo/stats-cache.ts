@@ -82,3 +82,13 @@ export function refetchWorkflowDetail(
     exact: true,
   })
 }
+
+/** List only — do not invalidate run detail (would refetch an open/cached drawer). */
+export function refetchWorkflowRuns(
+  queryClient: QueryClient,
+  workflowId: string
+) {
+  return queryClient.invalidateQueries({
+    queryKey: queryKeys.runs.lists(workflowId),
+  })
+}

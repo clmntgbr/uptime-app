@@ -1,11 +1,10 @@
 "use client"
 
-import { CallList } from "@/components/call/call-list"
+import { RunList } from "@/components/run/run-list"
 import { DashboardStats } from "@/components/stats/dashboard-stats"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { StaticVariables } from "@/components/variable/static-variables"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { ApiError } from "@/lib/api-error"
 import {
@@ -17,7 +16,12 @@ import {
 import type { Workflow } from "@/lib/workflow/types"
 import { ArrowLeftIcon, SettingsIcon } from "lucide-react"
 import Link from "next/link"
-import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
+import {
+  useParams,
+  usePathname,
+  useRouter,
+  useSearchParams,
+} from "next/navigation"
 import { useCallback, useState } from "react"
 
 const WORKFLOW_TABS = ["overview", "runs"] as const
@@ -177,7 +181,10 @@ export default function WorkflowPage() {
         </div>
       </div>
 
-      <TabsContent value="overview" className="flex flex-col gap-4 pt-4 text-sm">
+      <TabsContent
+        value="overview"
+        className="flex flex-col gap-4 pt-4 text-sm"
+      >
         {runMutation.error && (
           <p className="text-destructive">
             {formatRunError(runMutation.error)}
@@ -198,11 +205,11 @@ export default function WorkflowPage() {
           lastStatus={workflow.lastStatus}
           isRunning={workflow.isRunning}
         />
-        <CallList workflowId={workflow.id} />
-        <StaticVariables workflowId={workflow.id} />
       </TabsContent>
 
-      <TabsContent value="runs" className="pt-4 text-sm" />
+      <TabsContent value="runs" className="pt-4 text-sm">
+        <RunList key={workflow.id} workflowId={workflow.id} />
+      </TabsContent>
 
       <WorkflowDrawer
         open={drawerOpen}
