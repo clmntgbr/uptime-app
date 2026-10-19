@@ -15,11 +15,13 @@ export interface Workflow {
   /** Only set when `scheduleType` is `at` (RFC 3339, UTC). */
   runAt?: string
   enabled: boolean
+  /** True while a run is in progress for this workflow. */
+  isRunning: boolean
   /** Next scheduled run (RFC 3339); omitted when none / never. */
   nextRunAt?: string
   /** Last finished/started run (RFC 3339); omitted when never run. */
   lastRunAt?: string
-  /** Last run status: success | failed | error | skipped | running. */
+  /** Last run status: success | failed | error | skipped. */
   lastStatus?: string
 }
 

@@ -88,7 +88,7 @@ export default function WorkflowPage() {
   }
 
   const workflow = workflowQuery.data
-  const isRunning = (statsQuery.data?.runs.running ?? 0) > 0
+  const isRunning = workflow.isRunning
   const health = workflowHealth({
     enabled: workflow.enabled,
     openIncident: statsQuery.data?.openIncident,
@@ -176,6 +176,7 @@ export default function WorkflowPage() {
           workflowId={workflow.id}
           lastRunAt={workflow.lastRunAt}
           lastStatus={workflow.lastStatus}
+          isRunning={workflow.isRunning}
         />
         <CallList workflowId={workflow.id} />
         <StaticVariables workflowId={workflow.id} />

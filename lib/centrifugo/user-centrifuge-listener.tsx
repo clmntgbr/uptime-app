@@ -37,6 +37,9 @@ export function UserCentrifugeListener() {
 
       if (eventTypeEquals(event, "workflow.started")) {
         applyWorkflowStarted(queryClient, event.workflowId)
+        if (event.workflowId) {
+          void refetchWorkflowDetail(queryClient, event.workflowId)
+        }
         if (startedTimeoutRef.current) clearTimeout(startedTimeoutRef.current)
         startedTimeoutRef.current = setTimeout(() => {
           void refetchStatistics(queryClient)

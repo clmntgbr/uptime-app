@@ -141,10 +141,12 @@ export function DashboardStats({
   workflowId,
   lastRunAt,
   lastStatus,
+  isRunning = false,
 }: {
   workflowId?: string
   lastRunAt?: string
   lastStatus?: string
+  isRunning?: boolean
 } = {}) {
   const statsQuery = useDashboardStats(workflowId)
 
@@ -163,7 +165,6 @@ export function DashboardStats({
   const { runs, successRate, latencyP95Ms, openIncident, incidents } =
     statsQuery.data
   const failedRuns = runs.failed + runs.error
-  const running = runs.running
   const runsValue =
     failedRuns > 0 ? (
       <>
@@ -176,9 +177,9 @@ export function DashboardStats({
       runs.total
     )
 
-  const resolvedStatus =
-    lastStatus ??
-    (running > 0 ? "running" : openIncident ? "failed" : undefined)
+  const resolvedStatus = isRunning
+    ? "running"
+    : (lastStatus ?? (openIncident ? "failed" : undefined))
   const resolvedAt =
     lastRunAt ??
     (openIncident ? openIncidentStartedAt(incidents ?? []) : undefined)
@@ -202,9 +203,13 @@ export function DashboardStats({
         <StatCard
           description="Last run"
           value={
-            resolvedAt || resolvedStatus ? formatRelativeTime(resolvedAt) : "—"
+            isRunning
+              ? formatRunStatusLabel("running")
+              : resolvedAt || resolvedStatus
+                ? formatRelativeTime(resolvedAt)
+                : "—"
           }
-          badge={formatRunStatusLabel(resolvedStatus)}
+          badge={isRunning ? null : formatRunStatusLabel(resolvedStatus)}
           badgeVariant={lastRunBadgeVariant(resolvedStatus)}
         />
       </div>

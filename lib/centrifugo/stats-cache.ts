@@ -30,7 +30,7 @@ export function applyWorkflowStarted(
   if (workflowId) {
     queryClient.setQueryData<Workflow>(
       queryKeys.workflows.detail(workflowId),
-      (old) => (old ? { ...old, lastStatus: "running" } : old)
+      (old) => (old ? { ...old, isRunning: true } : old)
     )
   }
 }
