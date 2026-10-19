@@ -6,6 +6,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query"
+import { applyWorkflowStarted } from "@/lib/centrifugo/stats-cache"
 import { PaginateParams } from "@/lib/paginate"
 import { queryKeys } from "@/lib/query/keys"
 import {
@@ -67,14 +68,11 @@ export function useRunWorkflow() {
 
   return useMutation({
     mutationFn: (id: string) => runWorkflow(id),
-    onSuccess: (_data, id) =>
-      Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.workflows.detail(id),
-          exact: true,
-        }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.stats.all }),
-      ]),
+    onMutate: async (id) => {
+      // Optimistic UI only — Centrifugo workflow.started/finished owns the refetch.
+      await queryClient.cancelQueries({ queryKey: queryKeys.stats.all })
+      applyWorkflowStarted(queryClient, id)
+    },
   })
 }
 

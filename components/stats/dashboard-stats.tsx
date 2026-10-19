@@ -1,7 +1,7 @@
 "use client"
 
-import type { ReactNode } from "react"
 import { CircleHelpIcon } from "lucide-react"
+import type { ReactNode } from "react"
 
 import { StatsAreaChart } from "@/components/stats/stats-area-chart"
 import { Badge } from "@/components/ui/badge"
@@ -18,8 +18,14 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
-import { formatLatencyMs, formatRate } from "@/lib/stats/format"
+import {
+  formatLatencyMs,
+  formatRate,
+  formatRelativeTime,
+  formatRunStatusLabel,
+} from "@/lib/stats/format"
 import { useDashboardStats } from "@/lib/stats/hooks"
+import type { IncidentRange } from "@/lib/stats/types"
 
 function LatencyP95Label() {
   return (
@@ -29,7 +35,7 @@ function LatencyP95Label() {
         <HoverCardTrigger asChild>
           <button
             type="button"
-            className="inline-flex size-3.5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+            className="inline-flex size-3.5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
             aria-label="What is latency p95?"
           >
             <CircleHelpIcon className="size-3.5" />
@@ -38,9 +44,9 @@ function LatencyP95Label() {
         <HoverCardContent side="top" align="start" className="w-64 space-y-1.5">
           <p className="font-medium text-foreground">Latency p95</p>
           <p className="text-muted-foreground">
-            The 95th percentile of finished run durations over the last 24 hours.
-            95% of runs completed at or below this time; the slowest 5% took
-            longer.
+            The 95th percentile of finished run durations over the last 24
+            hours. 95% of runs completed at or below this time; the slowest 5%
+            took longer.
           </p>
         </HoverCardContent>
       </HoverCard>
@@ -52,12 +58,14 @@ function StatCard({
   description,
   value,
   badge = null,
+  badgeVariant = "outline",
   footerTitle = null,
   footerHint = null,
 }: {
   description: ReactNode
-  value: string | number
+  value: ReactNode
   badge?: string | null
+  badgeVariant?: "outline" | "destructive" | "secondary" | "default"
   footerTitle?: string | null
   footerHint?: string | null
 }) {
@@ -72,7 +80,7 @@ function StatCard({
         </CardTitle>
         {badge != null && (
           <CardAction>
-            <Badge variant="outline">{badge}</Badge>
+            <Badge variant={badgeVariant}>{badge}</Badge>
           </CardAction>
         )}
       </CardHeader>
@@ -90,10 +98,53 @@ function StatCard({
   )
 }
 
+function openIncidentStartedAt(incidents: IncidentRange[]): string | undefined {
+  const open = [...incidents].reverse().find((incident) => incident.end == null)
+  return open?.start
+}
+
+function lastRunBadgeVariant(
+  status: string | undefined
+): "outline" | "destructive" | "secondary" | "default" {
+  if (status === "failed" || status === "error") return "destructive"
+  if (status === "success") return "secondary"
+  return "outline"
+}
+
+function IncidentBanner({
+  openIncident,
+  incidents,
+}: {
+  openIncident: boolean
+  incidents: IncidentRange[]
+}) {
+  if (!openIncident) return null
+
+  const startedAt = openIncidentStartedAt(incidents)
+  const since = startedAt ? formatRelativeTime(startedAt) : null
+
+  return (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm"
+    >
+      <Badge variant="destructive">Incident</Badge>
+      <span className="font-medium text-destructive">Ongoing outage</span>
+      {since != null && since !== "—" && (
+        <span className="text-muted-foreground">Started {since}</span>
+      )}
+    </div>
+  )
+}
+
 export function DashboardStats({
   workflowId,
+  lastRunAt,
+  lastStatus,
 }: {
   workflowId?: string
+  lastRunAt?: string
+  lastStatus?: string
 } = {}) {
   const statsQuery = useDashboardStats(workflowId)
 
@@ -109,45 +160,52 @@ export function DashboardStats({
     )
   }
 
-  const { runs, successRate, latencyP95Ms, openIncident } = statsQuery.data
+  const { runs, successRate, latencyP95Ms, openIncident, incidents } =
+    statsQuery.data
   const failedRuns = runs.failed + runs.error
   const running = runs.running
+  const runsValue =
+    failedRuns > 0 ? (
+      <>
+        {runs.total}{" "}
+        <span className="text-sm font-normal text-muted-foreground">
+          with {failedRuns} failed
+        </span>
+      </>
+    ) : (
+      runs.total
+    )
 
-  const runsFooter =
-    running > 0
-      ? `${running} running`
-      : failedRuns > 0
-        ? `${failedRuns} failed`
-        : runs.total > 0
-          ? "No failures"
-          : null
+  const resolvedStatus =
+    lastStatus ??
+    (running > 0 ? "running" : openIncident ? "failed" : undefined)
+  const resolvedAt =
+    lastRunAt ??
+    (openIncident ? openIncidentStartedAt(incidents ?? []) : undefined)
 
   return (
     <div className="flex flex-col gap-4">
+      <IncidentBanner openIncident={openIncident} incidents={incidents ?? []} />
+
       <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs @xl/main:grid-cols-2 @5xl/main:grid-cols-4 dark:*:data-[slot=card]:bg-card">
         <StatCard
           description="Availability"
           value={runs.total > 0 ? formatRate(successRate) : "—"}
           badge="24h"
         />
-        <StatCard
-          description="Runs"
-          value={runs.total}
-          badge="24h"
-          footerTitle={runsFooter}
-          footerHint={
-            running > 0 && failedRuns > 0 ? `${failedRuns} failed` : null
-          }
-        />
+        <StatCard description="Runs" value={runsValue} badge="24h" />
         <StatCard
           description={<LatencyP95Label />}
           value={formatLatencyMs(latencyP95Ms)}
           badge="24h"
         />
         <StatCard
-          description="Open incident"
-          value={openIncident ? "Ongoing" : "None"}
-          badge={openIncident ? "Active" : null}
+          description="Last run"
+          value={
+            resolvedAt || resolvedStatus ? formatRelativeTime(resolvedAt) : "—"
+          }
+          badge={formatRunStatusLabel(resolvedStatus)}
+          badgeVariant={lastRunBadgeVariant(resolvedStatus)}
         />
       </div>
 

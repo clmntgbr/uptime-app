@@ -3,7 +3,6 @@
 import { CallList } from "@/components/call/call-list"
 import { DashboardStats } from "@/components/stats/dashboard-stats"
 import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { StaticVariables } from "@/components/variable/static-variables"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
@@ -14,6 +13,7 @@ import {
   useUpdateWorkflow,
   useWorkflow,
 } from "@/lib/workflow/hooks"
+import { workflowHealth, type WorkflowHealth } from "@/lib/workflow/status"
 import type { Workflow } from "@/lib/workflow/types"
 import { ArrowLeftIcon, SettingsIcon } from "lucide-react"
 import Link from "next/link"
@@ -37,6 +37,14 @@ function formatNextRun(nextRunAt: string | undefined) {
     hour: "2-digit",
     minute: "2-digit",
   })}`
+}
+
+function healthBadgeVariant(
+  health: WorkflowHealth
+): "secondary" | "destructive" | "outline" {
+  if (health === "failing") return "destructive"
+  if (health === "paused") return "outline"
+  return "secondary"
 }
 
 function workflowInputFrom(workflow: Workflow, enabled: boolean) {
@@ -81,6 +89,11 @@ export default function WorkflowPage() {
 
   const workflow = workflowQuery.data
   const isRunning = (statsQuery.data?.runs.running ?? 0) > 0
+  const health = workflowHealth({
+    enabled: workflow.enabled,
+    openIncident: statsQuery.data?.openIncident,
+    lastStatus: workflow.lastStatus,
+  })
 
   return (
     <div className="flex flex-col">
@@ -93,7 +106,7 @@ export default function WorkflowPage() {
           >
             <ArrowLeftIcon className="size-4" />
           </Link>
-          <div className="flex min-w-0 flex-1 items-center gap-1">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5">
             <h1 className="truncate text-sm font-medium">{workflow.name}</h1>
             <Button
               type="button"
@@ -107,32 +120,24 @@ export default function WorkflowPage() {
             </Button>
           </div>
           <div className="ms-auto flex shrink-0 items-center gap-3">
-            <span className="hidden text-xs text-muted-foreground sm:inline">
+            <span className="hidden text-xs text-muted-foreground md:inline">
               {formatNextRun(workflow.nextRunAt)}
             </span>
-            <div className="flex items-center gap-1.5">
-              <Switch
-                id="workflow-enabled-header"
-                size="sm"
-                checked={workflow.enabled}
-                disabled={updateMutation.isPending}
-                onCheckedChange={(enabled) =>
-                  updateMutation.mutate({
-                    id: workflow.id,
-                    input: workflowInputFrom(workflow, enabled),
-                  })
-                }
-                aria-label={
-                  workflow.enabled ? "Disable workflow" : "Enable workflow"
-                }
-              />
-              <Label
-                htmlFor="workflow-enabled-header"
-                className="hidden text-xs text-muted-foreground sm:inline"
-              >
-                {workflow.enabled ? "Active" : "Inactive"}
-              </Label>
-            </div>
+            <Switch
+              id="workflow-enabled-header"
+              size="sm"
+              checked={workflow.enabled}
+              disabled={updateMutation.isPending}
+              onCheckedChange={(enabled) =>
+                updateMutation.mutate({
+                  id: workflow.id,
+                  input: workflowInputFrom(workflow, enabled),
+                })
+              }
+              aria-label={
+                workflow.enabled ? "Disable workflow" : "Enable workflow"
+              }
+            />
             {isRunning ? (
               <Button
                 type="button"
@@ -167,7 +172,11 @@ export default function WorkflowPage() {
           <p className="text-destructive">{updateMutation.error.message}</p>
         )}
 
-        <DashboardStats workflowId={workflow.id} />
+        <DashboardStats
+          workflowId={workflow.id}
+          lastRunAt={workflow.lastRunAt}
+          lastStatus={workflow.lastStatus}
+        />
         <CallList workflowId={workflow.id} />
         <StaticVariables workflowId={workflow.id} />
         <WorkflowDrawer

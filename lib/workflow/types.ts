@@ -17,6 +17,10 @@ export interface Workflow {
   enabled: boolean
   /** Next scheduled run (RFC 3339); omitted when none / never. */
   nextRunAt?: string
+  /** Last finished/started run (RFC 3339); omitted when never run. */
+  lastRunAt?: string
+  /** Last run status: success | failed | error | skipped | running. */
+  lastStatus?: string
 }
 
 export interface WorkflowInput {

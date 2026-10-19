@@ -53,6 +53,7 @@ export function useCentrifuge(
       })
 
       centrifuge.on("publication", (ctx) => {
+        console.log("[Centrifugo] event", { channel: ctx.channel, data: ctx.data })
         onPublicationRef.current(ctx.data)
       })
 
