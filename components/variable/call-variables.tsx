@@ -4,6 +4,14 @@ import { Button } from "@/components/ui/button"
 import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { PlusIcon } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Sheet,
   SheetContent,
@@ -11,8 +19,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
+import { VARIABLE_TEXT_CLASS } from "@/components/variable/variable-text"
 import {
-  useAvailableVariables,
   useCallVariable,
   useCallVariables,
   useCreateCallVariable,
@@ -29,7 +37,7 @@ import {
 import { useState } from "react"
 
 const SOURCES: { value: CallVariableSource; label: string; hint: string }[] = [
-  { value: "json", label: "JSON", hint: "$.access_token" },
+  { value: "json", label: "Json", hint: "$.access_token" },
   { value: "header", label: "Header", hint: "X-Request-Id" },
   { value: "status", label: "Status code", hint: "" },
   { value: "regex", label: "Regex", hint: "token=(\\w+)" },
@@ -58,14 +66,7 @@ export function CallVariables({ workflowId, callId }: CallVariablesProps) {
   }
 
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Call variables</h3>
-        <Button size="sm" type="button" onClick={() => openDrawer(null)}>
-          New call variable
-        </Button>
-      </div>
-
+    <section className="flex flex-col gap-3">
       {variablesQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : variablesQuery.error ? (
@@ -82,14 +83,9 @@ export function CallVariables({ workflowId, callId }: CallVariablesProps) {
               className="flex items-center justify-between gap-2 px-3 py-2"
             >
               <span className="flex min-w-0 items-center gap-2">
-                <span className="">{`{{${variable.name}}}`}</span>
-                <span className="truncate text-muted-foreground">
-                  {variable.source}
-                  {variable.path ? ` · ${variable.path}` : ""}
-                </span>
-                {variable.secret && (
-                  <span className="text-muted-foreground">(secret)</span>
-                )}
+                <span
+                  className={VARIABLE_TEXT_CLASS}
+                >{`{{${variable.name}}}`}</span>
               </span>
               <div className="flex gap-2">
                 <Button
@@ -117,6 +113,17 @@ export function CallVariables({ workflowId, callId }: CallVariablesProps) {
           ))}
         </ul>
       )}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        onClick={() => openDrawer(null)}
+      >
+        <PlusIcon className="size-4" />
+        New call variable
+      </Button>
 
       {deleteMutation.error && (
         <p className="text-destructive">{deleteMutation.error.message}</p>
@@ -194,14 +201,7 @@ export function DraftCallVariables({
   }
 
   return (
-    <section className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <h3 className="font-semibold">Call variables</h3>
-        <Button size="sm" type="button" onClick={openCreate}>
-          New call variable
-        </Button>
-      </div>
-
+    <section className="flex flex-col gap-3">
       {!drafts.length ? (
         <p className="text-muted-foreground">
           No variables yet. They will be created with the call.
@@ -214,14 +214,9 @@ export function DraftCallVariables({
               className="flex items-center justify-between gap-2 px-3 py-2"
             >
               <span className="flex min-w-0 items-center gap-2">
-                <span className="">{`{{${variable.name}}}`}</span>
-                <span className="truncate text-muted-foreground">
-                  {variable.source ?? "json"}
-                  {variable.path ? ` · ${variable.path}` : ""}
-                </span>
-                {variable.secret && (
-                  <span className="text-muted-foreground">(secret)</span>
-                )}
+                <span
+                  className={VARIABLE_TEXT_CLASS}
+                >{`{{${variable.name}}}`}</span>
               </span>
               <div className="flex gap-2">
                 <Button
@@ -245,6 +240,17 @@ export function DraftCallVariables({
           ))}
         </ul>
       )}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        onClick={openCreate}
+      >
+        <PlusIcon className="size-4" />
+        New call variable
+      </Button>
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-md">
@@ -287,38 +293,6 @@ export function DraftCallVariables({
           )}
         </SheetContent>
       </Sheet>
-    </section>
-  )
-}
-
-/** Globals, workflow statics and extractions of previous calls. */
-export function AvailableVariables({ workflowId, callId }: CallVariablesProps) {
-  const variablesQuery = useAvailableVariables(workflowId, callId)
-
-  if (!variablesQuery.data?.length) return null
-
-  return (
-    <section className="flex flex-col gap-2">
-      <h3 className="font-semibold">Available variables</h3>
-      <ul className="flex flex-wrap gap-2">
-        {variablesQuery.data.map((variable) => (
-          <li
-            key={`${variable.type}-${variable.name}`}
-            className="rounded-md border px-2 py-1"
-            title={
-              "callName" in variable
-                ? `From call "${variable.callName}"`
-                : variable.type
-            }
-          >
-            {`{{${variable.name}}}`}
-            <span className="ms-1 text-muted-foreground">{variable.type}</span>
-            {variable.secret && (
-              <span className="ms-1 text-muted-foreground">· secret</span>
-            )}
-          </li>
-        ))}
-      </ul>
     </section>
   )
 }
@@ -520,20 +494,24 @@ function CallVariableForm({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="call-variable-source">Source</Label>
-        <select
-          id="call-variable-source"
+        <Select
           value={source}
-          onChange={(event) =>
-            setSource(event.target.value as CallVariableSource)
-          }
-          className="h-8 rounded-md border border-input bg-transparent px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          onValueChange={(value) => setSource(value as CallVariableSource)}
         >
-          {SOURCES.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger
+            id="call-variable-source"
+            className="h-9 w-full bg-background data-[size=default]:h-9 dark:bg-background dark:hover:bg-background"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SOURCES.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {source !== "status" && (

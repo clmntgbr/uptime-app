@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { VARIABLE_TEXT_CLASS } from "@/components/variable/variable-text"
 import {
   Sheet,
   SheetContent,
@@ -69,7 +70,7 @@ export function GlobalVariables() {
               className="flex items-center justify-between gap-2 px-4 py-2"
             >
               <span className="flex min-w-0 items-center gap-3">
-                <span className="">{`{{${variable.name}}}`}</span>
+                <span className={VARIABLE_TEXT_CLASS}>{`{{${variable.name}}}`}</span>
                 <span className="truncate text-muted-foreground">
                   {variable.value}
                 </span>

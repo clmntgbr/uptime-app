@@ -1,7 +1,12 @@
 "use client"
 
 import { Input } from "@/components/ui/input"
+import {
+  VARIABLE_TEXT_CLASS,
+  VariableText,
+} from "@/components/variable/variable-text"
 import { AvailableVariable } from "@/lib/variable/types"
+import { cn } from "@/lib/utils"
 import { useRef, useState } from "react"
 
 interface VariableInputProps extends Omit<
@@ -34,6 +39,8 @@ export function VariableInput({
   variables,
   onBlur,
   onFocus,
+  className,
+  placeholder,
   ...props
 }: VariableInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -71,29 +78,46 @@ export function VariableInput({
 
   return (
     <div className="flex flex-col gap-1">
-      <Input
-        {...props}
-        ref={inputRef}
-        value={value}
-        autoComplete="off"
-        onChange={(event) => {
-          onChange(event.target.value)
-          setCursor(event.target.selectionStart ?? event.target.value.length)
-        }}
-        onClick={syncCursor}
-        onKeyUp={syncCursor}
-        onSelect={syncCursor}
-        onFocus={(event) => {
-          setFocused(true)
-          syncCursor()
-          onFocus?.(event)
-        }}
-        onBlur={(event) => {
-          // Let mousedown on a suggestion apply before closing.
-          window.setTimeout(() => setFocused(false), 150)
-          onBlur?.(event)
-        }}
-      />
+      <div className="relative">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2 text-sm md:text-xs/relaxed"
+        >
+          {value ? (
+            <VariableText text={value} className="truncate whitespace-pre" />
+          ) : placeholder ? (
+            <span className="truncate text-muted-foreground">{placeholder}</span>
+          ) : null}
+        </div>
+        <Input
+          {...props}
+          ref={inputRef}
+          value={value}
+          placeholder={undefined}
+          autoComplete="off"
+          className={cn(
+            "relative text-transparent caret-foreground",
+            className
+          )}
+          onChange={(event) => {
+            onChange(event.target.value)
+            setCursor(event.target.selectionStart ?? event.target.value.length)
+          }}
+          onClick={syncCursor}
+          onKeyUp={syncCursor}
+          onSelect={syncCursor}
+          onFocus={(event) => {
+            setFocused(true)
+            syncCursor()
+            onFocus?.(event)
+          }}
+          onBlur={(event) => {
+            // Let mousedown on a suggestion apply before closing.
+            window.setTimeout(() => setFocused(false), 150)
+            onBlur?.(event)
+          }}
+        />
+      </div>
       {suggestions.length > 0 && (
         <ul className="max-h-40 overflow-y-auto rounded-md border bg-popover">
           {suggestions.map((variable) => (
@@ -106,7 +130,7 @@ export function VariableInput({
                   insertVariable(variable.name)
                 }}
               >
-                <span>{`{{${variable.name}}}`}</span>
+                <span className={VARIABLE_TEXT_CLASS}>{`{{${variable.name}}}`}</span>
                 <span className="text-muted-foreground">{variable.type}</span>
               </button>
             </li>

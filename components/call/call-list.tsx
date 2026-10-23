@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { VariableText } from "@/components/variable/variable-text"
 import { useCalls, useCopyCall, useDeleteCall } from "@/lib/call/hooks"
 import type { Call } from "@/lib/call/types"
 import { queryKeys } from "@/lib/query/keys"
@@ -83,23 +84,7 @@ function statusDotClass(status: string | undefined) {
 }
 
 function UrlPreview({ url }: { url: string }) {
-  const parts = url.split(/(\{\{[^}]+\}\})/g)
-  return (
-    <>
-      {parts.map((part, i) =>
-        part.startsWith("{{") ? (
-          <span
-            key={i}
-            className="font-semibold text-sky-600 dark:text-sky-400"
-          >
-            {part}
-          </span>
-        ) : (
-          <span key={i}>{part}</span>
-        )
-      )}
-    </>
-  )
+  return <VariableText text={url} />
 }
 
 function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {

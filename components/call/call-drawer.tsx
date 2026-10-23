@@ -1,14 +1,33 @@
 "use client"
 
+import { JsonBodyInput } from "@/components/call/json-body-input"
 import {
   fromRecord,
   KeyValueEditor,
   KeyValuePair,
   toRecord,
 } from "@/components/call/key-value-editor"
-import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Separator } from "@/components/ui/separator"
 import {
   Sheet,
   SheetContent,
@@ -16,9 +35,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
-import { Textarea } from "@/components/ui/textarea"
 import {
-  AvailableVariables,
   CallVariables,
   DraftCallVariables,
 } from "@/components/variable/call-variables"
@@ -40,6 +57,7 @@ import { createCallVariable } from "@/lib/variable/api"
 import { useCallFormVariables } from "@/lib/variable/hooks"
 import { CallVariableCreateInput } from "@/lib/variable/types"
 import { useQueryClient } from "@tanstack/react-query"
+import { Loader2Icon, Trash2Icon } from "lucide-react"
 import { useState } from "react"
 
 const METHODS: CallMethod[] = [
@@ -54,8 +72,16 @@ const METHODS: CallMethod[] = [
 
 const IP_VERSIONS: CallIpVersion[] = ["any", "ipv4", "ipv6"]
 
-const SELECT_CLASS_NAME =
-  "h-8 rounded-md border border-input bg-transparent px-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+function capitalizeLabel(value: string): string {
+  if (!value) return value
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
+}
+
+const FIELD_CLASS_NAME =
+  "h-9 bg-background dark:bg-background"
+/** Overrides SelectTrigger's default `data-[size=default]:h-7` and grey fill. */
+const SELECT_TRIGGER_CLASS_NAME =
+  "h-9 w-full bg-background data-[size=default]:h-9 dark:bg-background dark:hover:bg-background"
 
 interface CallDrawerProps {
   workflowId: string
@@ -82,6 +108,7 @@ export function CallDrawer({
   >([])
   const [isCreatingVariables, setIsCreatingVariables] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   const isPending =
     createMutation.isPending || updateMutation.isPending || isCreatingVariables
@@ -123,10 +150,10 @@ export function CallDrawer({
     onOpenChange(false)
   }
 
-  const handleDelete = async () => {
-    if (!callId || !callQuery.data) return
-    if (!window.confirm(`Delete call "${callQuery.data.name}"?`)) return
+  const confirmDelete = async () => {
+    if (!callId) return
     await deleteMutation.mutateAsync(callId)
+    setDeleteOpen(false)
     onOpenChange(false)
   }
 
@@ -138,23 +165,29 @@ export function CallDrawer({
       setDraftVariables([])
       setCreateError(null)
       setIsCreatingVariables(false)
+      setDeleteOpen(false)
     }
     onOpenChange(next)
   }
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>{isEdit ? "Edit call" : "New call"}</SheetTitle>
-        </SheetHeader>
+    <>
+      <Sheet open={open} onOpenChange={handleOpenChange}>
+        <SheetContent
+          showCloseButton
+          className="flex h-full w-[80vw]! max-w-[80vw]! flex-col gap-0 p-0 sm:max-w-[80vw]!"
+        >
+          <SheetHeader className="sr-only">
+            <SheetTitle>{isEdit ? "Edit call" : "New call"}</SheetTitle>
+          </SheetHeader>
 
-        {isEdit && callQuery.isLoading ? (
-          <p className="px-4 text-muted-foreground">Loading…</p>
-        ) : isEdit && callQuery.error ? (
-          <p className="px-4 text-destructive">{callQuery.error.message}</p>
-        ) : open ? (
-          <>
+          {isEdit && callQuery.isLoading ? (
+            <p className="px-6 py-8 text-muted-foreground">Loading…</p>
+          ) : isEdit && callQuery.error ? (
+            <p className="px-6 py-8 text-destructive">
+              {callQuery.error.message}
+            </p>
+          ) : open ? (
             <CallForm
               key={callQuery.data?.id ?? "new"}
               workflowId={workflowId}
@@ -168,27 +201,46 @@ export function CallDrawer({
                 deleteMutation.error?.message ??
                 null
               }
+              draftVariables={draftVariables}
+              onDraftVariablesChange={setDraftVariables}
               onSubmit={handleSubmit}
               onCancel={() => handleOpenChange(false)}
-              onDelete={isEdit ? handleDelete : undefined}
+              onDelete={isEdit ? () => setDeleteOpen(true) : undefined}
             />
-            <div className="flex flex-col gap-4 border-t p-4">
-              {callId ? (
-                <>
-                  <CallVariables workflowId={workflowId} callId={callId} />
-                  <AvailableVariables workflowId={workflowId} callId={callId} />
-                </>
-              ) : (
-                <DraftCallVariables
-                  drafts={draftVariables}
-                  onChange={setDraftVariables}
-                />
-              )}
-            </div>
-          </>
-        ) : null}
-      </SheetContent>
-    </Sheet>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete call?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <span className="font-medium text-foreground">
+                {callQuery.data?.name ?? "this call"}
+              </span>
+              . This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault()
+                void confirmDelete()
+              }}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
@@ -203,6 +255,8 @@ interface CallFormProps {
   isPending: boolean
   isDeleting?: boolean
   error: string | null
+  draftVariables: CallVariableCreateInput[]
+  onDraftVariablesChange: (drafts: CallVariableCreateInput[]) => void
   onSubmit: (input: CallInput) => Promise<void>
   onCancel: () => void
   onDelete?: () => void
@@ -215,11 +269,14 @@ function CallForm({
   isPending,
   isDeleting = false,
   error,
+  draftVariables,
+  onDraftVariablesChange,
   onSubmit,
   onCancel,
   onDelete,
 }: CallFormProps) {
   const variables = useCallFormVariables(workflowId, callId)
+  const busy = isPending || isDeleting
 
   const [name, setName] = useState(call?.name ?? "")
   const [method, setMethod] = useState<CallMethod>(call?.method ?? "GET")
@@ -258,141 +315,262 @@ function CallForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4 px-4">
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="call-name">Name</Label>
-        <Input
-          id="call-name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          maxLength={100}
-          required
-        />
-      </div>
+    <form
+      id="call-form"
+      onSubmit={handleSubmit}
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-8">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
+          <div className="space-y-1">
+            <h2 className="font-semibold">General Information</h2>
+            <p className="text-sm text-muted-foreground">
+              Define the call name, URL, and HTTP method.
+            </p>
+          </div>
+          <div className="flex flex-col gap-6 md:col-span-2">
+            <div className="space-y-2">
+              <Label htmlFor="call-name">
+                Name <span className="text-destructive">*</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                The name of the call
+              </p>
+              <Input
+                id="call-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={100}
+                required
+                className={FIELD_CLASS_NAME}
+              />
+            </div>
 
-      <div className="flex gap-2">
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="call-method">Method</Label>
-          <select
-            id="call-method"
-            value={method}
-            onChange={(event) => setMethod(event.target.value as CallMethod)}
-            className={SELECT_CLASS_NAME}
-          >
-            {METHODS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+            <div className="flex items-start gap-3">
+              <div className="w-[8.5rem] shrink-0 space-y-2">
+                <Label htmlFor="call-method">Method</Label>
+                <Select
+                  value={method}
+                  onValueChange={(value) => setMethod(value as CallMethod)}
+                >
+                  <SelectTrigger
+                    id="call-method"
+                    className={SELECT_TRIGGER_CLASS_NAME}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {METHODS.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {capitalizeLabel(value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <Label htmlFor="call-url">
+                  URL <span className="text-destructive">*</span>
+                </Label>
+                <VariableInput
+                  id="call-url"
+                  value={url}
+                  onChange={setUrl}
+                  variables={variables}
+                  placeholder="https://api.example.com/{{path}}"
+                  maxLength={2048}
+                  required
+                  className={FIELD_CLASS_NAME}
+                />
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-1 flex-col gap-2">
-          <Label htmlFor="call-url">URL</Label>
-          <VariableInput
-            id="call-url"
-            value={url}
-            onChange={setUrl}
-            variables={variables}
-            placeholder="https://api.example.com/{{path}}"
-            maxLength={2048}
-            required
-          />
+
+        <Separator className="my-10" />
+
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
+          <div className="space-y-1">
+            <h2 className="font-semibold">Request</h2>
+            <p className="text-sm text-muted-foreground">
+              Configure headers, query parameters, and body.
+            </p>
+          </div>
+          <div className="flex flex-col gap-6 md:col-span-2">
+            <KeyValueEditor
+              label="Headers"
+              description="Optional HTTP headers"
+              pairs={headers}
+              onChange={setHeaders}
+              variables={variables}
+              keyPlaceholder="Header"
+              valuePlaceholder="Value"
+              addLabel="Add header"
+            />
+
+            <KeyValueEditor
+              label="Query"
+              description="Optional query string parameters"
+              pairs={query}
+              onChange={setQuery}
+              variables={variables}
+              keyPlaceholder="Param"
+              valuePlaceholder="Value"
+              addLabel="Add query"
+            />
+
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <Label>Body</Label>
+                <p className="text-xs text-muted-foreground">
+                  Optional JSON request body
+                </p>
+              </div>
+              <JsonBodyInput value={body} onChange={setBody} title="Body" />
+            </div>
+          </div>
+        </div>
+
+        <Separator className="my-10" />
+
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
+          <div className="space-y-1">
+            <h2 className="font-semibold">Execution</h2>
+            <p className="text-sm text-muted-foreground">
+              Timeout, TLS, and network settings.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:col-span-2">
+            <div className="space-y-2">
+              <Label htmlFor="call-timeout">
+                Timeout (ms) <span className="text-destructive">*</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Between 100 and 60000 ms
+              </p>
+              <Input
+                id="call-timeout"
+                type="number"
+                min={100}
+                max={60000}
+                value={timeoutMs}
+                onChange={(event) => setTimeoutMs(event.target.value)}
+                required
+                className={FIELD_CLASS_NAME}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="call-ip-version">IP version</Label>
+              <p className="text-xs text-muted-foreground">
+                Prefer IPv4, IPv6, or any
+              </p>
+              <Select
+                value={ipVersion}
+                onValueChange={(value) => setIpVersion(value as CallIpVersion)}
+              >
+                <SelectTrigger
+                  id="call-ip-version"
+                  className={SELECT_TRIGGER_CLASS_NAME}
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {IP_VERSIONS.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {capitalizeLabel(value)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex h-9 items-center justify-between gap-4 rounded-md border border-input px-3 sm:col-span-2">
+              <Label htmlFor="call-verify-tls">Verify TLS certificate</Label>
+              <Switch
+                id="call-verify-tls"
+                checked={verifyTls}
+                onCheckedChange={setVerifyTls}
+              />
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="call-proxy">Proxy URL</Label>
+              <p className="text-xs text-muted-foreground">
+                Optional HTTP proxy
+              </p>
+              <VariableInput
+                id="call-proxy"
+                value={proxyUrl}
+                onChange={setProxyUrl}
+                variables={variables}
+                maxLength={2048}
+                className={FIELD_CLASS_NAME}
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator className="my-10" />
+
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
+          <div className="space-y-1">
+            <h2 className="font-semibold">Variables</h2>
+            <p className="text-sm text-muted-foreground">
+              Extract values from the response for later calls.
+            </p>
+          </div>
+          <div className="flex flex-col gap-6 md:col-span-2">
+            {callId ? (
+              <>
+                <CallVariables workflowId={workflowId} callId={callId} />
+              </>
+            ) : (
+              <DraftCallVariables
+                drafts={draftVariables}
+                onChange={onDraftVariablesChange}
+              />
+            )}
+          </div>
+        </div>
+
+        {error && <p className="mt-6 text-sm text-destructive">{error}</p>}
+      </div>
+
+      <div className="shrink-0 border-t bg-background px-6 py-4">
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            {onDelete ? (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={onDelete}
+                disabled={busy}
+              >
+                <Trash2Icon className="size-4" />
+                Delete
+              </Button>
+            ) : null}
+          </div>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={onCancel}
+              disabled={busy}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="w-full sm:w-auto" disabled={busy}>
+              {call ? "Update" : "Create"}
+              {isPending ? (
+                <Loader2Icon className="size-4 animate-spin" />
+              ) : null}
+            </Button>
+          </div>
         </div>
       </div>
-
-      <div className="flex gap-2">
-        <div className="flex flex-1 flex-col gap-2">
-          <Label htmlFor="call-timeout">Timeout (ms)</Label>
-          <Input
-            id="call-timeout"
-            type="number"
-            min={100}
-            max={60000}
-            value={timeoutMs}
-            onChange={(event) => setTimeoutMs(event.target.value)}
-            required
-          />
-        </div>
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="call-ip-version">IP version</Label>
-          <select
-            id="call-ip-version"
-            value={ipVersion}
-            onChange={(event) =>
-              setIpVersion(event.target.value as CallIpVersion)
-            }
-            className={SELECT_CLASS_NAME}
-          >
-            {IP_VERSIONS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <Switch
-          id="call-verify-tls"
-          checked={verifyTls}
-          onCheckedChange={setVerifyTls}
-        />
-        <Label htmlFor="call-verify-tls">Verify TLS</Label>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="call-proxy">Proxy URL (optional)</Label>
-        <VariableInput
-          id="call-proxy"
-          value={proxyUrl}
-          onChange={setProxyUrl}
-          variables={variables}
-          maxLength={2048}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="call-body">Body (optional)</Label>
-        <Textarea
-          id="call-body"
-          value={body}
-          onChange={(event) => setBody(event.target.value)}
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>Headers</Label>
-        <KeyValueEditor
-          pairs={headers}
-          onChange={setHeaders}
-          variables={variables}
-          keyPlaceholder="Header"
-          valuePlaceholder="Value"
-        />
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label>Query</Label>
-        <KeyValueEditor
-          pairs={query}
-          onChange={setQuery}
-          variables={variables}
-          keyPlaceholder="Param"
-          valuePlaceholder="Value"
-        />
-      </div>
-
-      {error && <p className="text-destructive">{error}</p>}
-
-      <DrawerFormActions
-        isEdit={Boolean(call)}
-        isPending={isPending}
-        isDeleting={isDeleting}
-        submitLabel={call ? "Save" : "Create"}
-        onCancel={onCancel}
-        onDelete={onDelete}
-      />
     </form>
   )
 }
