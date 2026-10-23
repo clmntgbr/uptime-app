@@ -34,7 +34,7 @@ function JsonBlock({ value }: { value: unknown }) {
     return <p className="text-muted-foreground">—</p>
   }
   return (
-    <pre className="max-h-48 overflow-auto rounded-md border bg-muted/40 p-2 font-mono text-[0.6875rem] leading-relaxed whitespace-pre-wrap break-all">
+    <pre className="max-h-48 overflow-auto rounded-md border bg-muted/40 p-2 text-[0.6875rem] leading-relaxed break-all whitespace-pre-wrap">
       {JSON.stringify(value, null, 2)}
     </pre>
   )
@@ -56,8 +56,8 @@ function KeyValueMap({
           key={key}
           className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-2 px-3 py-1.5"
         >
-          <dt className="truncate font-mono text-muted-foreground">{key}</dt>
-          <dd className="truncate font-mono">{value}</dd>
+          <dt className="truncate text-muted-foreground">{key}</dt>
+          <dd className="truncate">{value}</dd>
         </div>
       ))}
     </dl>
@@ -165,7 +165,7 @@ function RunDetailBody({ run }: { run: RunDetail }) {
         <Badge variant={statusBadgeVariant(run.status)}>
           {formatRunStatusLabel(run.status)}
         </Badge>
-        <span className="capitalize text-muted-foreground">{run.trigger}</span>
+        <span className="text-muted-foreground capitalize">{run.trigger}</span>
         <span className="text-muted-foreground tabular-nums">
           {formatLatencyMs(run.durationMs)}
         </span>
@@ -238,7 +238,7 @@ export function RunDrawer({
       >
         <SheetHeader className="border-b px-4 py-3">
           <SheetTitle>Run details</SheetTitle>
-          <SheetDescription className="font-mono text-[0.6875rem]">
+          <SheetDescription className="text-[0.6875rem]">
             {runId ?? "—"}
           </SheetDescription>
         </SheetHeader>

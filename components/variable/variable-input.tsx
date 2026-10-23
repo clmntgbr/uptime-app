@@ -4,8 +4,10 @@ import { Input } from "@/components/ui/input"
 import { AvailableVariable } from "@/lib/variable/types"
 import { useRef, useState } from "react"
 
-interface VariableInputProps
-  extends Omit<React.ComponentProps<typeof Input>, "onChange" | "value"> {
+interface VariableInputProps extends Omit<
+  React.ComponentProps<typeof Input>,
+  "onChange" | "value"
+> {
   value: string
   onChange: (value: string) => void
   variables: AvailableVariable[]
@@ -54,8 +56,7 @@ export function VariableInput({
   const insertVariable = (name: string) => {
     if (!trigger) return
     const insertion = `{{${name}}}`
-    const next =
-      value.slice(0, trigger.start) + insertion + value.slice(cursor)
+    const next = value.slice(0, trigger.start) + insertion + value.slice(cursor)
     onChange(next)
     setFocused(false)
 
@@ -99,7 +100,7 @@ export function VariableInput({
             <li key={`${variable.type}-${variable.name}`}>
               <button
                 type="button"
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-start font-mono hover:bg-muted"
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-start hover:bg-muted"
                 onMouseDown={(event) => {
                   event.preventDefault()
                   insertVariable(variable.name)

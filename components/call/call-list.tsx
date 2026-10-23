@@ -1,9 +1,19 @@
 "use client"
 
 import { CallDrawer } from "@/components/call/call-drawer"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { useCalls, useCreateCall, useDeleteCall } from "@/lib/call/hooks"
-import type { Call, CallMethod } from "@/lib/call/types"
+import { useCalls, useCopyCall, useDeleteCall } from "@/lib/call/hooks"
+import type { Call } from "@/lib/call/types"
 import { queryKeys } from "@/lib/query/keys"
 import { cn } from "@/lib/utils"
 import {
@@ -44,40 +54,6 @@ const DROP_ANIMATION: DropAnimation = {
     styles: { active: { opacity: "0.5" } },
   }),
 }
-
-/** Soft elevation from dnd-kit Sortable Item. */
-const ITEM_SHADOW =
-  "shadow-[0_0_0_1px_rgba(63,63,68,0.05),0_1px_3px_0_rgba(34,33,81,0.15)]"
-const ITEM_SHADOW_PICKED =
-  "shadow-[0_0_0_1px_rgba(63,63,68,0.05),-1px_0_15px_0_rgba(34,33,81,0.01),0_15px_15px_0_rgba(34,33,81,0.25)]"
-
-const METHODS: CallMethod[] = [
-  "GET",
-  "POST",
-  "PUT",
-  "PATCH",
-  "DELETE",
-  "HEAD",
-  "OPTIONS",
-]
-
-function methodAccent(method: string | undefined) {
-  switch ((method ?? "").toUpperCase()) {
-    case "GET":
-      return "bg-emerald-500"
-    case "POST":
-      return "bg-amber-500"
-    case "PUT":
-      return "bg-sky-500"
-    case "PATCH":
-      return "bg-violet-500"
-    case "DELETE":
-      return "bg-red-500"
-    default:
-      return "bg-muted-foreground/40"
-  }
-}
-
 function methodClass(method: string | undefined) {
   switch ((method ?? "").toUpperCase()) {
     case "GET":
@@ -112,7 +88,10 @@ function UrlPreview({ url }: { url: string }) {
     <>
       {parts.map((part, i) =>
         part.startsWith("{{") ? (
-          <span key={i} className="text-sky-600 dark:text-sky-400">
+          <span
+            key={i}
+            className="font-semibold text-sky-600 dark:text-sky-400"
+          >
             {part}
           </span>
         ) : (
@@ -134,7 +113,6 @@ function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
 
 function CallCard({
   call,
-  index,
   overlay,
   onOpen,
   onRemove,
@@ -142,7 +120,6 @@ function CallCard({
   deleting,
 }: {
   call: Call
-  index: number
   overlay?: boolean
   onOpen?: () => void
   onRemove?: () => void
@@ -186,27 +163,17 @@ function CallCard({
     >
       <div
         className={cn(
-          "group relative flex items-center gap-2.5 rounded-md bg-card py-3.5 pr-3 pl-3.5 outline-none transition-[box-shadow] duration-200",
-          ITEM_SHADOW,
+          "group relative flex items-center gap-2.5 rounded-md border bg-card py-3.5 pr-3 pl-3.5 duration-200 outline-none",
           isDragging && !overlay && "opacity-50",
-          overlay && ITEM_SHADOW_PICKED,
-          !overlay && !isDragging && "hover:shadow-md"
+          !overlay && !isDragging
         )}
       >
-        <span
-          className={cn(
-            "absolute top-0 bottom-0 left-0 w-[3px] rounded-l-md",
-            methodAccent(call.method)
-          )}
-          aria-hidden
-        />
-
         <button
           type="button"
           {...attributes}
           {...listeners}
           aria-label="Reorder"
-          className="flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground/40 hover:bg-muted hover:text-foreground active:cursor-grabbing"
+          className="flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground/40 active:cursor-grabbing"
         >
           <GripVerticalIcon className="size-4" />
         </button>
@@ -216,15 +183,11 @@ function CallCard({
           onClick={onOpen}
           title={method}
           className={cn(
-            "flex h-9 w-12 shrink-0 items-center justify-center rounded-md font-mono text-[11px] font-semibold",
+            "flex h-9 w-12 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold",
             methodClass(call.method)
           )}
         >
-          {method === "DELETE"
-            ? "DEL"
-            : method === "OPTIONS"
-              ? "OPT"
-              : method}
+          {method === "DELETE" ? "DEL" : method === "OPTIONS" ? "OPT" : method}
         </button>
 
         <button
@@ -233,14 +196,11 @@ function CallCard({
           className="min-w-0 flex-1 text-left"
         >
           <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {String(index + 1).padStart(2, "0")}
-            </span>
             <span className="truncate text-sm font-medium text-foreground">
               {call.name}
             </span>
           </div>
-          <span className="mt-0.5 block w-full truncate font-mono text-xs text-muted-foreground">
+          <span className="mt-0.5 block w-full truncate text-xs text-muted-foreground">
             <UrlPreview url={call.url || "—"} />
           </span>
         </button>
@@ -262,7 +222,6 @@ function CallCard({
             aria-label={`Delete ${call.name}`}
             disabled={deleting}
             onClick={onRemove}
-            className="hover:text-destructive"
           >
             <XIcon />
           </Button>
@@ -287,10 +246,11 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const [editedId, setEditedId] = useState<string | null>(null)
   const [localOrder, setLocalOrder] = useState<string[] | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [callToDelete, setCallToDelete] = useState<Call | null>(null)
 
   const callsQuery = useCalls(workflowId)
   const deleteMutation = useDeleteCall(workflowId)
-  const createMutation = useCreateCall(workflowId)
+  const copyMutation = useCopyCall(workflowId)
 
   const calls = callsQuery.data ?? EMPTY_CALLS
 
@@ -323,20 +283,16 @@ export function CallList({ workflowId }: { workflowId: string }) {
     setDrawerOpen(true)
   }
 
-  const handleDelete = (callId: string, name: string) => {
-    if (!window.confirm(`Delete call "${name}"?`)) return
-    deleteMutation.mutate(callId)
+  const confirmDelete = () => {
+    const id = callToDelete?.id
+    if (!id) return
+    deleteMutation.mutate(id, {
+      onSuccess: () => setCallToDelete(null),
+    })
   }
 
   const handleDuplicate = (call: Call) => {
-    const method = (call.method ?? "GET").toUpperCase()
-    createMutation.mutate({
-      name: `${call.name} (copy)`,
-      method: (METHODS.includes(method as CallMethod)
-        ? method
-        : "GET") as CallMethod,
-      url: call.url || "/",
-    })
+    copyMutation.mutate(call.id)
   }
 
   const applyOrder = (next: string[]) => {
@@ -371,7 +327,7 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const active = orderedCalls.find((call) => call.id === activeId)
 
   return (
-    <section className="flex flex-col items-center gap-3">
+    <section className="flex flex-col items-center gap-3 py-10">
       {callsQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : callsQuery.error ? (
@@ -388,28 +344,27 @@ export function CallList({ workflowId }: { workflowId: string }) {
             items={orderedCalls.map((call) => call.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ol className="mx-auto flex w-full max-w-xl flex-col items-stretch gap-0">
-              {orderedCalls.map((call, index) => (
+            <ol className="mx-auto flex w-full max-w-xl flex-col items-stretch">
+              {orderedCalls.map((call) => (
                 <li key={call.id} className="relative list-none">
                   <CallCard
                     call={call}
-                    index={index}
                     onOpen={() => openEdit(call.id)}
-                    onRemove={() => handleDelete(call.id, call.name)}
+                    onRemove={() => setCallToDelete(call)}
                     onDuplicate={() => handleDuplicate(call)}
                     deleting={
                       deleteMutation.isPending &&
                       deleteMutation.variables === call.id
                     }
                   />
-                  {index < orderedCalls.length && (
-                    <div
-                      className="flex h-5 items-center justify-center text-muted-foreground/40"
-                      aria-hidden
-                    >
-                      <ArrowDownIcon className="size-3.5" />
-                    </div>
-                  )}
+                  <div
+                    className="flex h-8 flex-col items-center justify-center text-muted-foreground/50"
+                    aria-hidden
+                  >
+                    <span className="w-px flex-1 bg-border" />
+                    <ArrowDownIcon className="size-3.5 shrink-0" />
+                    <span className="w-px flex-1 bg-border" />
+                  </div>
                 </li>
               ))}
               <li className="list-none">
@@ -417,8 +372,7 @@ export function CallList({ workflowId }: { workflowId: string }) {
                   type="button"
                   onClick={openCreate}
                   className={cn(
-                    "flex min-h-[62px] w-full items-center justify-center gap-2 rounded-md border border-dashed bg-card/50 text-sm text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-card hover:text-foreground",
-                    ITEM_SHADOW
+                    "flex min-h-15.5 w-full items-center justify-center gap-2 rounded-md border border-dashed bg-card/50 text-sm text-muted-foreground transition-colors"
                   )}
                 >
                   <PlusIcon className="size-4" />
@@ -430,22 +384,53 @@ export function CallList({ workflowId }: { workflowId: string }) {
           <DragOverlay dropAnimation={DROP_ANIMATION}>
             {active ? (
               <div className="w-full max-w-xl">
-                <CallCard
-                  call={active}
-                  index={orderedCalls.indexOf(active)}
-                  overlay
-                />
+                <CallCard call={active} overlay />
               </div>
             ) : null}
           </DragOverlay>
         </DndContext>
       )}
 
-      {(deleteMutation.error || createMutation.error) && (
+      {(deleteMutation.error || copyMutation.error) && (
         <p className="text-destructive">
-          {deleteMutation.error?.message ?? createMutation.error?.message}
+          {deleteMutation.error?.message ?? copyMutation.error?.message}
         </p>
       )}
+
+      <AlertDialog
+        open={callToDelete != null}
+        onOpenChange={(open) => {
+          if (!open) setCallToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete call?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <span className="font-medium text-foreground">
+                {callToDelete?.name}
+              </span>
+              . This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault()
+                confirmDelete()
+              }}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CallDrawer
         workflowId={workflowId}

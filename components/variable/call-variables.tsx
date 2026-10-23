@@ -82,7 +82,7 @@ export function CallVariables({ workflowId, callId }: CallVariablesProps) {
               className="flex items-center justify-between gap-2 px-3 py-2"
             >
               <span className="flex min-w-0 items-center gap-2">
-                <span className="font-mono">{`{{${variable.name}}}`}</span>
+                <span className="">{`{{${variable.name}}}`}</span>
                 <span className="truncate text-muted-foreground">
                   {variable.source}
                   {variable.path ? ` · ${variable.path}` : ""}
@@ -186,7 +186,9 @@ export function DraftCallVariables({
     if (editedIndex === null) {
       onChange([...drafts, input])
     } else {
-      onChange(drafts.map((draft, index) => (index === editedIndex ? input : draft)))
+      onChange(
+        drafts.map((draft, index) => (index === editedIndex ? input : draft))
+      )
     }
     setDrawerOpen(false)
   }
@@ -212,7 +214,7 @@ export function DraftCallVariables({
               className="flex items-center justify-between gap-2 px-3 py-2"
             >
               <span className="flex min-w-0 items-center gap-2">
-                <span className="font-mono">{`{{${variable.name}}}`}</span>
+                <span className="">{`{{${variable.name}}}`}</span>
                 <span className="truncate text-muted-foreground">
                   {variable.source ?? "json"}
                   {variable.path ? ` · ${variable.path}` : ""}
@@ -248,7 +250,9 @@ export function DraftCallVariables({
         <SheetContent className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader>
             <SheetTitle>
-              {editedIndex === null ? "New call variable" : "Edit call variable"}
+              {editedIndex === null
+                ? "New call variable"
+                : "Edit call variable"}
             </SheetTitle>
           </SheetHeader>
           {drawerOpen && (
@@ -300,7 +304,7 @@ export function AvailableVariables({ workflowId, callId }: CallVariablesProps) {
         {variablesQuery.data.map((variable) => (
           <li
             key={`${variable.type}-${variable.name}`}
-            className="rounded-md border px-2 py-1 font-mono"
+            className="rounded-md border px-2 py-1"
             title={
               "callName" in variable
                 ? `From call "${variable.callName}"`
@@ -555,7 +559,7 @@ function CallVariableForm({
                 <li key={key}>
                   <button
                     type="button"
-                    className="w-full px-3 py-1.5 text-start font-mono hover:bg-muted"
+                    className="w-full px-3 py-1.5 text-start hover:bg-muted"
                     onMouseDown={(event) => {
                       event.preventDefault()
                       setPath(toJsonPath(key))

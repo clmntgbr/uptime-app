@@ -358,7 +358,6 @@ function CallForm({
           id="call-body"
           value={body}
           onChange={(event) => setBody(event.target.value)}
-          className="font-mono"
         />
       </div>
 

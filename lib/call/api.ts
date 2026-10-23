@@ -75,3 +75,20 @@ export const deleteCall = async (
     throw await parseApiError(response, "Failed to delete call")
   }
 }
+
+/** POST /api/workflows/:id/calls/:callId/copy → 201 */
+export const copyCall = async (
+  workflowId: string,
+  callId: string
+): Promise<Call> => {
+  const response = await fetch(
+    `/api/workflows/${workflowId}/calls/${callId}/copy`,
+    { method: "POST" }
+  )
+
+  if (!response.ok) {
+    throw await parseApiError(response, "Failed to copy call")
+  }
+
+  return response.json()
+}

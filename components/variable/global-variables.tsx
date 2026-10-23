@@ -69,7 +69,7 @@ export function GlobalVariables() {
               className="flex items-center justify-between gap-2 px-4 py-2"
             >
               <span className="flex min-w-0 items-center gap-3">
-                <span className="font-mono">{`{{${variable.name}}}`}</span>
+                <span className="">{`{{${variable.name}}}`}</span>
                 <span className="truncate text-muted-foreground">
                   {variable.value}
                 </span>

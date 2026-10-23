@@ -2,7 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/query/keys"
-import { createCall, deleteCall, getCall, listCalls, updateCall } from "./api"
+import {
+  copyCall,
+  createCall,
+  deleteCall,
+  getCall,
+  listCalls,
+  updateCall,
+} from "./api"
 import { CallInput } from "./types"
 
 export function useCalls(workflowId: string) {
@@ -54,6 +61,15 @@ export function useDeleteCall(workflowId: string) {
 
   return useMutation({
     mutationFn: (callId: string) => deleteCall(workflowId, callId),
+    onSuccess: invalidate,
+  })
+}
+
+export function useCopyCall(workflowId: string) {
+  const invalidate = useInvalidateCalls(workflowId)
+
+  return useMutation({
+    mutationFn: (callId: string) => copyCall(workflowId, callId),
     onSuccess: invalidate,
   })
 }
