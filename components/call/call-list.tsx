@@ -1,55 +1,84 @@
 "use client"
 
 import { CallDrawer } from "@/components/call/call-drawer"
-import {
-  Attachment,
-  AttachmentAction,
-  AttachmentActions,
-  AttachmentContent,
-  AttachmentDescription,
-  AttachmentMedia,
-  AttachmentTitle,
-  AttachmentTrigger,
-} from "@/components/ui/attachment"
-import { useCalls, useDeleteCall } from "@/lib/call/hooks"
-import type { Call } from "@/lib/call/types"
+import { Button } from "@/components/ui/button"
+import { useCalls, useCreateCall, useDeleteCall } from "@/lib/call/hooks"
+import type { Call, CallMethod } from "@/lib/call/types"
 import { queryKeys } from "@/lib/query/keys"
 import { cn } from "@/lib/utils"
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  defaultDropAnimationSideEffects,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+  type DropAnimation,
+} from "@dnd-kit/core"
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { useQueryClient } from "@tanstack/react-query"
-import { ArrowDownIcon, ArrowRightIcon, PlusIcon, XIcon } from "lucide-react"
-import { useMemo, useState } from "react"
+import {
+  ArrowDownIcon,
+  CopyIcon,
+  GripVerticalIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 
 const EMPTY_CALLS: Call[] = []
-const COLS = 5
 
-function reorder<T>(list: T[], from: number, to: number): T[] {
-  if (
-    from === to ||
-    from < 0 ||
-    to < 0 ||
-    from >= list.length ||
-    to >= list.length
-  ) {
-    return list
-  }
-  const next = [...list]
-  const [item] = next.splice(from, 1)
-  next.splice(to, 0, item)
-  return next
+const DROP_ANIMATION: DropAnimation = {
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.5" } },
+  }),
 }
 
-function methodShortLabel(method: string | undefined) {
+/** Soft elevation from dnd-kit Sortable Item. */
+const ITEM_SHADOW =
+  "shadow-[0_0_0_1px_rgba(63,63,68,0.05),0_1px_3px_0_rgba(34,33,81,0.15)]"
+const ITEM_SHADOW_PICKED =
+  "shadow-[0_0_0_1px_rgba(63,63,68,0.05),-1px_0_15px_0_rgba(34,33,81,0.01),0_15px_15px_0_rgba(34,33,81,0.25)]"
+
+const METHODS: CallMethod[] = [
+  "GET",
+  "POST",
+  "PUT",
+  "PATCH",
+  "DELETE",
+  "HEAD",
+  "OPTIONS",
+]
+
+function methodAccent(method: string | undefined) {
   switch ((method ?? "").toUpperCase()) {
+    case "GET":
+      return "bg-emerald-500"
+    case "POST":
+      return "bg-amber-500"
+    case "PUT":
+      return "bg-sky-500"
+    case "PATCH":
+      return "bg-violet-500"
     case "DELETE":
-      return "DEL"
-    case "OPTIONS":
-      return "OPT"
+      return "bg-red-500"
     default:
-      return (method ?? "?").toUpperCase()
+      return "bg-muted-foreground/40"
   }
 }
 
-function methodMediaClass(method: string | undefined) {
+function methodClass(method: string | undefined) {
   switch ((method ?? "").toUpperCase()) {
     case "GET":
       return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
@@ -77,6 +106,23 @@ function statusDotClass(status: string | undefined) {
   return "bg-muted-foreground/30"
 }
 
+function UrlPreview({ url }: { url: string }) {
+  const parts = url.split(/(\{\{[^}]+\}\})/g)
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.startsWith("{{") ? (
+          <span key={i} className="text-sky-600 dark:text-sky-400">
+            {part}
+          </span>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  )
+}
+
 function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
   if (!localOrder) return serverIds
   const next = localOrder.filter((id) => serverIds.includes(id))
@@ -86,36 +132,151 @@ function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
   return next
 }
 
-function SlotConnector({
-  hasNext,
+function CallCard({
+  call,
   index,
+  overlay,
+  onOpen,
+  onRemove,
+  onDuplicate,
+  deleting,
 }: {
-  hasNext: boolean
+  call: Call
   index: number
+  overlay?: boolean
+  onOpen?: () => void
+  onRemove?: () => void
+  onDuplicate?: () => void
+  deleting?: boolean
 }) {
-  if (!hasNext) return null
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: call.id,
+    disabled: !!overlay,
+  })
 
-  const isLastInRow = (index + 1) % COLS === 0
+  useEffect(() => {
+    if (!overlay) return
+    document.body.style.cursor = "grabbing"
+    return () => {
+      document.body.style.cursor = ""
+    }
+  }, [overlay])
 
-  if (isLastInRow) {
-    return (
-      <div
-        className="pointer-events-none absolute top-full left-1/2 flex h-10 w-0 -translate-x-1/2 flex-col items-center text-muted-foreground"
-        aria-hidden
-      >
-        <span className="w-px flex-1 bg-border" />
-        <ArrowDownIcon className="size-3.5 shrink-0" />
-      </div>
-    )
-  }
+  const method = (call.method ?? "GET").toUpperCase()
 
   return (
     <div
-      className="pointer-events-none absolute top-1/2 -right-6 flex h-0 w-6 -translate-y-1/2 items-center text-muted-foreground"
-      aria-hidden
+      ref={overlay ? undefined : setNodeRef}
+      style={
+        overlay
+          ? undefined
+          : {
+              transform: CSS.Transform.toString(transform),
+              transition,
+            }
+      }
+      className={cn(overlay && "scale-105")}
     >
-      <span className="h-px flex-1 bg-border" />
-      <ArrowRightIcon className="size-3.5 shrink-0" />
+      <div
+        className={cn(
+          "group relative flex items-center gap-2.5 rounded-md bg-card py-3.5 pr-3 pl-3.5 outline-none transition-[box-shadow] duration-200",
+          ITEM_SHADOW,
+          isDragging && !overlay && "opacity-50",
+          overlay && ITEM_SHADOW_PICKED,
+          !overlay && !isDragging && "hover:shadow-md"
+        )}
+      >
+        <span
+          className={cn(
+            "absolute top-0 bottom-0 left-0 w-[3px] rounded-l-md",
+            methodAccent(call.method)
+          )}
+          aria-hidden
+        />
+
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          aria-label="Reorder"
+          className="flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground/40 hover:bg-muted hover:text-foreground active:cursor-grabbing"
+        >
+          <GripVerticalIcon className="size-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpen}
+          title={method}
+          className={cn(
+            "flex h-9 w-12 shrink-0 items-center justify-center rounded-md font-mono text-[11px] font-semibold",
+            methodClass(call.method)
+          )}
+        >
+          {method === "DELETE"
+            ? "DEL"
+            : method === "OPTIONS"
+              ? "OPT"
+              : method}
+        </button>
+
+        <button
+          type="button"
+          onClick={onOpen}
+          className="min-w-0 flex-1 text-left"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {String(index + 1).padStart(2, "0")}
+            </span>
+            <span className="truncate text-sm font-medium text-foreground">
+              {call.name}
+            </span>
+          </div>
+          <span className="mt-0.5 block w-full truncate font-mono text-xs text-muted-foreground">
+            <UrlPreview url={call.url || "—"} />
+          </span>
+        </button>
+
+        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Duplicate ${call.name}`}
+            onClick={onDuplicate}
+          >
+            <CopyIcon />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            aria-label={`Delete ${call.name}`}
+            disabled={deleting}
+            onClick={onRemove}
+            className="hover:text-destructive"
+          >
+            <XIcon />
+          </Button>
+        </div>
+
+        <span
+          className={cn(
+            "size-2 shrink-0 self-center rounded-full",
+            statusDotClass(call.lastStatus)
+          )}
+          title={call.lastStatus ?? "never run"}
+          aria-label={call.lastStatus ?? "never run"}
+        />
+      </div>
     </div>
   )
 }
@@ -125,10 +286,11 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editedId, setEditedId] = useState<string | null>(null)
   const [localOrder, setLocalOrder] = useState<string[] | null>(null)
-  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
 
   const callsQuery = useCalls(workflowId)
   const deleteMutation = useDeleteCall(workflowId)
+  const createMutation = useCreateCall(workflowId)
 
   const calls = callsQuery.data ?? EMPTY_CALLS
 
@@ -143,6 +305,13 @@ export function CallList({ workflowId }: { workflowId: string }) {
       .map((id) => byId.get(id))
       .filter((call): call is Call => call != null)
   }, [calls, localOrder])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   const openCreate = () => {
     setEditedId(null)
@@ -159,13 +328,18 @@ export function CallList({ workflowId }: { workflowId: string }) {
     deleteMutation.mutate(callId)
   }
 
-  const moveCall = (fromId: string, toId: string) => {
-    if (fromId === toId) return
-    const currentIds = orderedCalls.map((call) => call.id)
-    const from = currentIds.indexOf(fromId)
-    const to = currentIds.indexOf(toId)
-    if (from < 0 || to < 0) return
-    const next = reorder(currentIds, from, to)
+  const handleDuplicate = (call: Call) => {
+    const method = (call.method ?? "GET").toUpperCase()
+    createMutation.mutate({
+      name: `${call.name} (copy)`,
+      method: (METHODS.includes(method as CallMethod)
+        ? method
+        : "GET") as CallMethod,
+      url: call.url || "/",
+    })
+  }
+
+  const applyOrder = (next: string[]) => {
     setLocalOrder(next)
     queryClient.setQueryData<Call[]>(
       queryKeys.calls.list(workflowId),
@@ -179,129 +353,98 @@ export function CallList({ workflowId }: { workflowId: string }) {
     )
   }
 
-  const slotCount = orderedCalls.length + 1
+  const onDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id))
+  }
+
+  const onDragEnd = (event: DragEndEvent) => {
+    setActiveId(null)
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const ids = orderedCalls.map((call) => call.id)
+    const from = ids.indexOf(String(active.id))
+    const to = ids.indexOf(String(over.id))
+    if (from < 0 || to < 0) return
+    applyOrder(arrayMove(ids, from, to))
+  }
+
+  const active = orderedCalls.find((call) => call.id === activeId)
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="font-semibold">Calls</h2>
-
+    <section className="flex flex-col items-center gap-3">
       {callsQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : callsQuery.error ? (
         <p className="text-destructive">{callsQuery.error.message}</p>
       ) : (
-        <div
-          className="grid grid-cols-5 gap-x-6 gap-y-10"
-          role="list"
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          onDragCancel={() => setActiveId(null)}
         >
-          {orderedCalls.map((call, index) => {
-            const method = (call.method ?? "?").toUpperCase()
-            const hasNext = index < slotCount - 1
-
-            return (
-              <div
-                key={call.id}
-                className="relative min-w-0"
-                role="listitem"
-              >
-                <Attachment
-                  state="idle"
-                  className={cn(
-                    "w-full max-w-none min-w-0",
-                    draggingId === call.id
-                      ? "cursor-grabbing opacity-60 ring-1 ring-ring"
-                      : "cursor-grab"
-                  )}
-                  draggable
-                  onDragStart={(event) => {
-                    setDraggingId(call.id)
-                    event.dataTransfer.effectAllowed = "move"
-                    event.dataTransfer.setData("text/call-id", call.id)
-                  }}
-                  onDragEnd={() => setDraggingId(null)}
-                  onDragOver={(event) => {
-                    if (
-                      !Array.from(event.dataTransfer.types).includes(
-                        "text/call-id"
-                      )
-                    ) {
-                      return
+          <SortableContext
+            items={orderedCalls.map((call) => call.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ol className="mx-auto flex w-full max-w-xl flex-col items-stretch gap-0">
+              {orderedCalls.map((call, index) => (
+                <li key={call.id} className="relative list-none">
+                  <CallCard
+                    call={call}
+                    index={index}
+                    onOpen={() => openEdit(call.id)}
+                    onRemove={() => handleDelete(call.id, call.name)}
+                    onDuplicate={() => handleDuplicate(call)}
+                    deleting={
+                      deleteMutation.isPending &&
+                      deleteMutation.variables === call.id
                     }
-                    event.preventDefault()
-                    event.dataTransfer.dropEffect = "move"
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault()
-                    const fromId = event.dataTransfer.getData("text/call-id")
-                    if (fromId) moveCall(fromId, call.id)
-                    setDraggingId(null)
-                  }}
-                >
-                  <AttachmentTrigger
-                    aria-label={`Edit ${call.name}`}
-                    onClick={() => openEdit(call.id)}
                   />
-                  <AttachmentMedia
-                    title={method}
-                    aria-label={method}
-                    className={cn(
-                      "px-0.5 text-center text-[0.625rem] leading-none font-semibold",
-                      methodMediaClass(call.method)
-                    )}
-                  >
-                    {methodShortLabel(call.method)}
-                  </AttachmentMedia>
-                  <AttachmentContent>
-                    <AttachmentTitle>{call.name}</AttachmentTitle>
-                    <AttachmentDescription title={call.url}>
-                      {call.url || "—"}
-                    </AttachmentDescription>
-                  </AttachmentContent>
-                  <AttachmentActions>
-                    <AttachmentAction
-                      aria-label={`Delete ${call.name}`}
-                      disabled={
-                        deleteMutation.isPending &&
-                        deleteMutation.variables === call.id
-                      }
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        handleDelete(call.id, call.name)
-                      }}
+                  {index < orderedCalls.length && (
+                    <div
+                      className="flex h-5 items-center justify-center text-muted-foreground/40"
+                      aria-hidden
                     >
-                      <XIcon />
-                    </AttachmentAction>
-                  </AttachmentActions>
-                  <span
-                    className={cn(
-                      "relative z-20 size-2 shrink-0 self-center rounded-full",
-                      statusDotClass(call.lastStatus)
-                    )}
-                    title={call.lastStatus ?? "never run"}
-                    aria-label={call.lastStatus ?? "never run"}
-                  />
-                </Attachment>
-
-                <SlotConnector hasNext={hasNext} index={index} />
+                      <ArrowDownIcon className="size-3.5" />
+                    </div>
+                  )}
+                </li>
+              ))}
+              <li className="list-none">
+                <button
+                  type="button"
+                  onClick={openCreate}
+                  className={cn(
+                    "flex min-h-[62px] w-full items-center justify-center gap-2 rounded-md border border-dashed bg-card/50 text-sm text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-card hover:text-foreground",
+                    ITEM_SHADOW
+                  )}
+                >
+                  <PlusIcon className="size-4" />
+                  Add call
+                </button>
+              </li>
+            </ol>
+          </SortableContext>
+          <DragOverlay dropAnimation={DROP_ANIMATION}>
+            {active ? (
+              <div className="w-full max-w-xl">
+                <CallCard
+                  call={active}
+                  index={orderedCalls.indexOf(active)}
+                  overlay
+                />
               </div>
-            )
-          })}
-
-          <div className="relative min-w-0" role="listitem">
-            <button
-              type="button"
-              onClick={openCreate}
-              className="flex h-full min-h-14 w-full items-center justify-center gap-2 rounded-lg border border-dashed bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:outline-none"
-            >
-              <PlusIcon className="size-4 shrink-0" />
-              Add call
-            </button>
-          </div>
-        </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       )}
 
-      {deleteMutation.error && (
-        <p className="text-destructive">{deleteMutation.error.message}</p>
+      {(deleteMutation.error || createMutation.error) && (
+        <p className="text-destructive">
+          {deleteMutation.error?.message ?? createMutation.error?.message}
+        </p>
       )}
 
       <CallDrawer
