@@ -79,26 +79,13 @@ export function VariableInput({
   return (
     <div className="flex flex-col gap-1">
       <div className="relative">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 flex items-center overflow-hidden px-2 text-sm md:text-xs/relaxed"
-        >
-          {value ? (
-            <VariableText text={value} className="truncate whitespace-pre" />
-          ) : placeholder ? (
-            <span className="truncate text-muted-foreground">{placeholder}</span>
-          ) : null}
-        </div>
         <Input
           {...props}
           ref={inputRef}
           value={value}
           placeholder={undefined}
           autoComplete="off"
-          className={cn(
-            "relative text-transparent caret-foreground",
-            className
-          )}
+          className={cn("text-transparent caret-foreground", className)}
           onChange={(event) => {
             onChange(event.target.value)
             setCursor(event.target.selectionStart ?? event.target.value.length)
@@ -117,6 +104,16 @@ export function VariableInput({
             onBlur?.(event)
           }}
         />
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-10 flex items-center overflow-hidden px-2 text-sm text-foreground md:text-xs/relaxed"
+        >
+          {value ? (
+            <VariableText text={value} className="truncate whitespace-pre" />
+          ) : placeholder ? (
+            <span className="truncate text-muted-foreground">{placeholder}</span>
+          ) : null}
+        </div>
       </div>
       {suggestions.length > 0 && (
         <ul className="max-h-40 overflow-y-auto rounded-md border bg-popover">

@@ -57,7 +57,7 @@ import { createCallVariable } from "@/lib/variable/api"
 import { useCallFormVariables } from "@/lib/variable/hooks"
 import { CallVariableCreateInput } from "@/lib/variable/types"
 import { useQueryClient } from "@tanstack/react-query"
-import { Loader2Icon, Trash2Icon } from "lucide-react"
+import { Loader2Icon, Trash2Icon, XIcon } from "lucide-react"
 import { useState } from "react"
 
 const METHODS: CallMethod[] = [
@@ -70,15 +70,17 @@ const METHODS: CallMethod[] = [
   "OPTIONS",
 ]
 
-const IP_VERSIONS: CallIpVersion[] = ["any", "ipv4", "ipv6"]
+const IP_VERSIONS: { value: Exclude<CallIpVersion, "any">; label: string }[] = [
+  { value: "ipv4", label: "IPV4" },
+  { value: "ipv6", label: "IPV6" },
+]
 
 function capitalizeLabel(value: string): string {
   if (!value) return value
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase()
 }
 
-const FIELD_CLASS_NAME =
-  "h-9 bg-background dark:bg-background"
+const FIELD_CLASS_NAME = "h-9 bg-background dark:bg-background"
 /** Overrides SelectTrigger's default `data-[size=default]:h-7` and grey fill. */
 const SELECT_TRIGGER_CLASS_NAME =
   "h-9 w-full bg-background data-[size=default]:h-9 dark:bg-background dark:hover:bg-background"
@@ -283,8 +285,12 @@ function CallForm({
   const [url, setUrl] = useState(call?.url ?? "")
   const [timeoutMs, setTimeoutMs] = useState(String(call?.timeoutMs ?? 30000))
   const [verifyTls, setVerifyTls] = useState(call?.verifyTls ?? true)
-  const [ipVersion, setIpVersion] = useState<CallIpVersion>(
-    call?.ipVersion ?? "any"
+  const [ipVersion, setIpVersion] = useState<
+    Exclude<CallIpVersion, "any"> | undefined
+  >(
+    call?.ipVersion === "ipv4" || call?.ipVersion === "ipv6"
+      ? call.ipVersion
+      : undefined
   )
   const [proxyUrl, setProxyUrl] = useState(call?.proxyUrl ?? "")
   const [body, setBody] = useState(call?.body ?? "")
@@ -303,7 +309,7 @@ function CallForm({
         url: url.trim(),
         timeoutMs: Number(timeoutMs),
         verifyTls,
-        ipVersion,
+        ipVersion: ipVersion ?? "any",
         proxyUrl: proxyUrl.trim() || undefined,
         body: body || undefined,
         headers: toRecord(headers),
@@ -333,9 +339,6 @@ function CallForm({
               <Label htmlFor="call-name">
                 Name <span className="text-destructive">*</span>
               </Label>
-              <p className="text-xs text-muted-foreground">
-                The name of the call
-              </p>
               <Input
                 id="call-name"
                 value={name}
@@ -463,35 +466,51 @@ function CallForm({
             <div className="space-y-2">
               <Label htmlFor="call-ip-version">IP version</Label>
               <p className="text-xs text-muted-foreground">
-                Prefer IPv4, IPv6, or any
+                Prefer IPV4 or IPV6. When empty, any IP version is used.
               </p>
-              <Select
-                value={ipVersion}
-                onValueChange={(value) => setIpVersion(value as CallIpVersion)}
-              >
-                <SelectTrigger
-                  id="call-ip-version"
-                  className={SELECT_TRIGGER_CLASS_NAME}
+              <div className="relative">
+                <Select
+                  value={ipVersion ?? ""}
+                  onValueChange={(value) =>
+                    setIpVersion(value as Exclude<CallIpVersion, "any">)
+                  }
                 >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {IP_VERSIONS.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {capitalizeLabel(value)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <SelectTrigger
+                    id="call-ip-version"
+                    className={SELECT_TRIGGER_CLASS_NAME}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {IP_VERSIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {ipVersion && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute end-8 top-1/2 size-6 -translate-y-1/2"
+                    aria-label="Clear IP version"
+                    onClick={() => setIpVersion(undefined)}
+                  >
+                    <XIcon className="size-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
 
-            <div className="flex h-9 items-center justify-between gap-4 rounded-md border border-input px-3 sm:col-span-2">
-              <Label htmlFor="call-verify-tls">Verify TLS certificate</Label>
+            <div className="flex items-center space-x-2 sm:col-span-2">
               <Switch
                 id="call-verify-tls"
                 checked={verifyTls}
                 onCheckedChange={setVerifyTls}
               />
+              <Label htmlFor="call-verify-tls">Verify TLS certificate</Label>
             </div>
 
             <div className="space-y-2 sm:col-span-2">
