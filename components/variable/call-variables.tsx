@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { PlusIcon } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -34,6 +33,7 @@ import {
   CallVariableCreateInput,
   CallVariableSource,
 } from "@/lib/variable/types"
+import { PlusIcon } from "lucide-react"
 import { useState } from "react"
 
 const SOURCES: { value: CallVariableSource; label: string; hint: string }[] = [
@@ -122,7 +122,7 @@ export function CallVariables({ workflowId, callId }: CallVariablesProps) {
         onClick={() => openDrawer(null)}
       >
         <PlusIcon className="size-4" />
-        New call variable
+        Add variable
       </Button>
 
       {deleteMutation.error && (
@@ -249,16 +249,14 @@ export function DraftCallVariables({
         onClick={openCreate}
       >
         <PlusIcon className="size-4" />
-        New call variable
+        Add variable
       </Button>
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader>
             <SheetTitle>
-              {editedIndex === null
-                ? "New call variable"
-                : "Edit call variable"}
+              {editedIndex === null ? "Add variable" : "Edit call variable"}
             </SheetTitle>
           </SheetHeader>
           {drawerOpen && (
@@ -367,9 +365,7 @@ function CallVariableDrawer({
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>
-            {isEdit ? "Edit call variable" : "New call variable"}
-          </SheetTitle>
+          <SheetTitle>{isEdit ? "Edit variable" : "Add variable"}</SheetTitle>
         </SheetHeader>
 
         {isEdit && variableQuery.isLoading ? (
