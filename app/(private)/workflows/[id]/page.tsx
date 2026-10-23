@@ -1,5 +1,6 @@
 "use client"
 
+import { CallList } from "@/components/call/call-list"
 import { RunList } from "@/components/run/run-list"
 import { DashboardStats } from "@/components/stats/dashboard-stats"
 import { Button } from "@/components/ui/button"
@@ -205,6 +206,7 @@ export default function WorkflowPage() {
           lastStatus={workflow.lastStatus}
           isRunning={workflow.isRunning}
         />
+        <CallList workflowId={workflow.id} />
       </TabsContent>
 
       <TabsContent value="runs" className="pt-4 text-sm">

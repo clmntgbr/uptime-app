@@ -61,6 +61,13 @@ export interface CallInput {
 export interface Call {
   id: string
   name: string
+  method?: CallMethod | string
+  url?: string
+  position?: number
+  lastStatus?: string
+  lastHttpStatus?: number
+  lastFinishedAt?: string
+  lastLatencyMs?: number
 }
 
 export interface CallDetail extends Call {
