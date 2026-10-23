@@ -39,13 +39,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useQueryClient } from "@tanstack/react-query"
-import {
-  ArrowDownIcon,
-  CopyIcon,
-  GripVerticalIcon,
-  PlusIcon,
-  XIcon,
-} from "lucide-react"
+import { CopyIcon, GripVerticalIcon, XIcon } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 const EMPTY_CALLS: Call[] = []
@@ -55,36 +49,65 @@ const DROP_ANIMATION: DropAnimation = {
     styles: { active: { opacity: "0.5" } },
   }),
 }
+
 function methodClass(method: string | undefined) {
   switch ((method ?? "").toUpperCase()) {
     case "GET":
-      return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
+      return "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
     case "POST":
-      return "bg-amber-500/15 text-amber-700 dark:text-amber-400"
+      return "bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
     case "PUT":
-      return "bg-sky-500/15 text-sky-700 dark:text-sky-400"
+      return "bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
     case "PATCH":
-      return "bg-violet-500/15 text-violet-700 dark:text-violet-400"
+      return "bg-violet-50 text-violet-800 dark:bg-violet-950 dark:text-violet-300"
     case "DELETE":
-      return "bg-red-500/15 text-red-700 dark:text-red-400"
-    case "HEAD":
-    case "OPTIONS":
-      return "bg-slate-500/15 text-slate-700 dark:text-slate-300"
+      return "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-300"
     default:
       return "bg-muted text-muted-foreground"
   }
 }
 
-function statusDotClass(status: string | undefined) {
-  if (status === "failed" || status === "error") return "bg-destructive"
-  if (status === "success") return "bg-emerald-500"
-  if (status === "running") return "bg-sky-500"
-  if (status === "skipped") return "bg-muted-foreground/50"
-  return "bg-muted-foreground/30"
+function statusPill(status: string | undefined) {
+  if (status === "success") {
+    return {
+      label: "OK",
+      className:
+        "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
+      dot: "bg-emerald-500",
+    }
+  }
+  if (status === "failed" || status === "error") {
+    return {
+      label: "Failed",
+      className: "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-300",
+      dot: "bg-destructive",
+    }
+  }
+  if (status === "running") {
+    return {
+      label: "Running",
+      className: "bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
+      dot: "bg-sky-500",
+    }
+  }
+  if (status === "skipped") {
+    return {
+      label: "Skipped",
+      className: "bg-muted text-muted-foreground",
+      dot: "bg-muted-foreground/50",
+    }
+  }
+  return {
+    label: "Never",
+    className: "bg-muted text-muted-foreground",
+    dot: "bg-muted-foreground/40",
+  }
 }
 
-function UrlPreview({ url }: { url: string }) {
-  return <VariableText text={url} />
+function formatLatency(ms: number | undefined) {
+  if (ms == null) return null
+  if (ms >= 1000) return `${(ms / 1000).toFixed(1)} s`
+  return `${Math.round(ms)} ms`
 }
 
 function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
@@ -98,6 +121,8 @@ function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
 
 function CallCard({
   call,
+  index,
+  hasNext,
   overlay,
   onOpen,
   onRemove,
@@ -105,6 +130,8 @@ function CallCard({
   deleting,
 }: {
   call: Call
+  index: number
+  hasNext?: boolean
   overlay?: boolean
   onOpen?: () => void
   onRemove?: () => void
@@ -132,6 +159,8 @@ function CallCard({
   }, [overlay])
 
   const method = (call.method ?? "GET").toUpperCase()
+  const pill = statusPill(call.lastStatus)
+  const latency = formatLatency(call.lastLatencyMs)
 
   return (
     <div
@@ -144,82 +173,102 @@ function CallCard({
               transition,
             }
       }
-      className={cn(overlay && "scale-105")}
+      className={cn(
+        "flex gap-4",
+        !overlay && hasNext && "pb-3",
+        overlay && "scale-[1.01]",
+        isDragging && !overlay && "opacity-50"
+      )}
     >
       <div
         className={cn(
-          "group relative flex items-center gap-2.5 rounded-md border bg-card py-3.5 pr-3 pl-3.5 duration-200 outline-none",
-          isDragging && !overlay && "opacity-50",
-          !overlay && !isDragging
+          "group min-w-0 flex-1 overflow-hidden rounded-[14px] border border-border bg-background",
+          overlay && "shadow-lg"
         )}
       >
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          aria-label="Reorder"
-          className="flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground/40 active:cursor-grabbing"
-        >
-          <GripVerticalIcon className="size-4" />
-        </button>
-
-        <button
-          type="button"
-          onClick={onOpen}
-          title={method}
-          className={cn(
-            "flex h-9 w-12 shrink-0 items-center justify-center rounded-md text-[11px] font-semibold",
-            methodClass(call.method)
+        <div className="flex flex-wrap items-center gap-3 px-[18px] py-3.5 sm:gap-4">
+          {!overlay && (
+            <button
+              type="button"
+              {...attributes}
+              {...listeners}
+              aria-label={`Reorder ${call.name}`}
+              className="flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground active:cursor-grabbing"
+            >
+              <GripVerticalIcon className="size-4" />
+            </button>
           )}
-        >
-          {method === "DELETE" ? "DEL" : method === "OPTIONS" ? "OPT" : method}
-        </button>
+          <span
+            title={method}
+            className={cn(
+              "flex h-7 w-14 shrink-0 items-center justify-center rounded-md font-mono text-xs font-semibold",
+              methodClass(call.method)
+            )}
+          >
+            {method === "DELETE"
+              ? "DEL"
+              : method === "OPTIONS"
+                ? "OPT"
+                : method}
+          </span>
 
-        <button
-          type="button"
-          onClick={onOpen}
-          className="min-w-0 flex-1 text-left"
-        >
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-sm font-medium text-foreground">
+          <button
+            type="button"
+            onClick={onOpen}
+            className="min-w-0 flex-1 basis-[260px] text-left"
+          >
+            <span className="block truncate text-[15px] font-semibold text-foreground">
               {call.name}
             </span>
+            <span className="mt-1 block overflow-hidden font-mono text-[12.5px] leading-5 text-ellipsis whitespace-nowrap text-muted-foreground">
+              <VariableText text={call.url || "—"} variant="chip" />
+            </span>
+          </button>
+
+          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+            {latency && (
+              <div className="flex min-w-14 flex-col gap-0.5">
+                <span className="text-xs text-muted-foreground">Latency</span>
+                <span className="text-sm font-semibold">{latency}</span>
+              </div>
+            )}
+
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium",
+                pill.className
+              )}
+              aria-label={call.lastStatus ?? "never run"}
+            >
+              <span className={cn("size-1.5 rounded-full", pill.dot)} />
+              {pill.label}
+            </span>
+
+            <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-9"
+                aria-label={`Duplicate ${call.name}`}
+                onClick={onDuplicate}
+              >
+                <CopyIcon className="size-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-9"
+                aria-label={`Delete ${call.name}`}
+                disabled={deleting}
+                onClick={onRemove}
+              >
+                <XIcon className="size-4" />
+              </Button>
+            </div>
           </div>
-          <span className="mt-0.5 block w-full truncate text-xs text-muted-foreground">
-            <UrlPreview url={call.url || "—"} />
-          </span>
-        </button>
-
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Duplicate ${call.name}`}
-            onClick={onDuplicate}
-          >
-            <CopyIcon />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            aria-label={`Delete ${call.name}`}
-            disabled={deleting}
-            onClick={onRemove}
-          >
-            <XIcon />
-          </Button>
         </div>
-
-        <span
-          className={cn(
-            "size-2 shrink-0 self-center rounded-full",
-            statusDotClass(call.lastStatus)
-          )}
-          title={call.lastStatus ?? "never run"}
-          aria-label={call.lastStatus ?? "never run"}
-        />
       </div>
     </div>
   )
@@ -312,7 +361,7 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const active = orderedCalls.find((call) => call.id === activeId)
 
   return (
-    <section className="flex flex-col items-center gap-3 py-10">
+    <section className="container mx-auto mt-10 flex flex-col gap-5">
       {callsQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : callsQuery.error ? (
@@ -329,11 +378,13 @@ export function CallList({ workflowId }: { workflowId: string }) {
             items={orderedCalls.map((call) => call.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ol className="mx-auto flex w-full max-w-xl flex-col items-stretch">
-              {orderedCalls.map((call) => (
-                <li key={call.id} className="relative list-none">
+            <ol className="flex flex-col">
+              {orderedCalls.map((call, index) => (
+                <li key={call.id} className="list-none">
                   <CallCard
                     call={call}
+                    index={index}
+                    hasNext
                     onOpen={() => openEdit(call.id)}
                     onRemove={() => setCallToDelete(call)}
                     onDuplicate={() => handleDuplicate(call)}
@@ -342,44 +393,20 @@ export function CallList({ workflowId }: { workflowId: string }) {
                       deleteMutation.variables === call.id
                     }
                   />
-                  <div
-                    className="flex h-8 flex-col items-center justify-center text-muted-foreground/50"
-                    aria-hidden
-                  >
-                    <span className="w-px flex-1 bg-border" />
-                    <ArrowDownIcon className="size-3.5 shrink-0" />
-                    <span className="w-px flex-1 bg-border" />
-                  </div>
                 </li>
               ))}
-              <li className="list-none">
-                <button
-                  type="button"
-                  onClick={openCreate}
-                  className={cn(
-                    "flex min-h-15.5 w-full items-center justify-center gap-2 rounded-md border border-dashed bg-card/50 text-sm text-muted-foreground transition-colors"
-                  )}
-                >
-                  <PlusIcon className="size-4" />
-                  Add call
-                </button>
-              </li>
             </ol>
           </SortableContext>
           <DragOverlay dropAnimation={DROP_ANIMATION}>
             {active ? (
-              <div className="w-full max-w-xl">
-                <CallCard call={active} overlay />
-              </div>
+              <CallCard
+                call={active}
+                index={orderedCalls.findIndex((c) => c.id === active.id)}
+                overlay
+              />
             ) : null}
           </DragOverlay>
         </DndContext>
-      )}
-
-      {(deleteMutation.error || copyMutation.error) && (
-        <p className="text-destructive">
-          {deleteMutation.error?.message ?? copyMutation.error?.message}
-        </p>
       )}
 
       <AlertDialog
