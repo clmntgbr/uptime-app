@@ -24,7 +24,6 @@ import {
   formatRunStatusLabel,
 } from "@/lib/stats/format"
 import { useDashboardStats, useRelativeTime } from "@/lib/stats/hooks"
-import type { IncidentRange } from "@/lib/stats/types"
 
 function LatencyP95Label() {
   return (
@@ -97,11 +96,6 @@ function StatCard({
   )
 }
 
-function openIncidentStartedAt(incidents: IncidentRange[]): string | undefined {
-  const open = [...incidents].reverse().find((incident) => incident.end == null)
-  return open?.start
-}
-
 function lastRunBadgeVariant(
   status: string | undefined
 ): "outline" | "destructive" | "secondary" | "default" {
@@ -110,25 +104,36 @@ function lastRunBadgeVariant(
   return "outline"
 }
 
+function countWithFailures(
+  total: number,
+  failed: number,
+  error: number
+): ReactNode {
+  const parts: string[] = []
+  if (failed > 0) parts.push(`${failed} failed`)
+  if (error > 0) parts.push(`${error} error${error === 1 ? "" : "s"}`)
+  if (!parts.length) return total
+  return (
+    <>
+      {total}{" "}
+      <span className="text-sm font-normal text-muted-foreground">
+        with {parts.join(", ")}
+      </span>
+    </>
+  )
+}
+
 function LastRunStatCard({
   isRunning,
   lastRunAt,
   lastStatus,
-  openIncident,
-  incidents,
 }: {
   isRunning: boolean
   lastRunAt?: string
   lastStatus?: string
-  openIncident: boolean
-  incidents: IncidentRange[]
 }) {
-  const resolvedStatus = isRunning
-    ? "running"
-    : (lastStatus ?? (openIncident ? "failed" : undefined))
-  const resolvedAt =
-    lastRunAt ?? (openIncident ? openIncidentStartedAt(incidents) : undefined)
-  const lastRunRelative = useRelativeTime(isRunning ? null : resolvedAt)
+  const lastRunRelative = useRelativeTime(isRunning ? null : lastRunAt)
+  const resolvedStatus = isRunning ? "running" : lastStatus
 
   return (
     <StatCard
@@ -136,11 +141,17 @@ function LastRunStatCard({
       value={
         isRunning
           ? formatRunStatusLabel("running")
-          : resolvedAt || resolvedStatus
+          : lastRunAt
             ? lastRunRelative
             : "—"
       }
-      badge={isRunning ? null : formatRunStatusLabel(resolvedStatus)}
+      badge={
+        isRunning
+          ? null
+          : resolvedStatus
+            ? formatRunStatusLabel(resolvedStatus)
+            : null
+      }
       badgeVariant={lastRunBadgeVariant(resolvedStatus)}
     />
   )
@@ -171,20 +182,9 @@ export function DashboardStats({
     )
   }
 
-  const { runs, successRate, latencyP95Ms, openIncident, incidents } =
-    statsQuery.data
-  const failedRuns = runs.failed + runs.error
-  const runsValue =
-    failedRuns > 0 ? (
-      <>
-        {runs.total}{" "}
-        <span className="text-sm font-normal text-muted-foreground">
-          with {failedRuns} failed
-        </span>
-      </>
-    ) : (
-      runs.total
-    )
+  const { runs, calls, successRate, latencyP95Ms } = statsQuery.data
+  const runsValue = countWithFailures(runs.total, runs.failed, runs.error)
+  const callsValue = countWithFailures(calls.total, calls.failed, calls.error)
 
   return (
     <div className="flex flex-col gap-4">
@@ -200,13 +200,15 @@ export function DashboardStats({
           value={formatLatencyMs(latencyP95Ms)}
           badge="24h"
         />
-        <LastRunStatCard
-          isRunning={isRunning}
-          lastRunAt={lastRunAt}
-          lastStatus={lastStatus}
-          openIncident={openIncident}
-          incidents={incidents ?? []}
-        />
+        {workflowId ? (
+          <LastRunStatCard
+            isRunning={isRunning}
+            lastRunAt={lastRunAt}
+            lastStatus={lastStatus}
+          />
+        ) : (
+          <StatCard description="Calls" value={callsValue} badge="24h" />
+        )}
       </div>
 
       <StatsAreaChart

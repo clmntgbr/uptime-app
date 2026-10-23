@@ -7,22 +7,20 @@ import {
   AttachmentActions,
   AttachmentContent,
   AttachmentDescription,
-  AttachmentGroup,
   AttachmentMedia,
   AttachmentTitle,
   AttachmentTrigger,
 } from "@/components/ui/attachment"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import { useCalls, useDeleteCall } from "@/lib/call/hooks"
 import type { Call } from "@/lib/call/types"
 import { queryKeys } from "@/lib/query/keys"
-import { formatRunStatusLabel } from "@/lib/stats/format"
+import { cn } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
-import { ArrowRightIcon, XIcon } from "lucide-react"
+import { ArrowDownIcon, ArrowRightIcon, PlusIcon, XIcon } from "lucide-react"
 import { useMemo, useState } from "react"
 
 const EMPTY_CALLS: Call[] = []
+const COLS = 5
 
 function reorder<T>(list: T[], from: number, to: number): T[] {
   if (
@@ -71,17 +69,12 @@ function methodMediaClass(method: string | undefined) {
   }
 }
 
-function statusBadgeClass(status: string | undefined) {
-  if (status === "failed" || status === "error") {
-    return "border-transparent bg-destructive/15 text-destructive"
-  }
-  if (status === "success") {
-    return "border-transparent bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-  }
-  if (status === "running") {
-    return "border-transparent bg-sky-500/15 text-sky-700 dark:text-sky-400"
-  }
-  return undefined
+function statusDotClass(status: string | undefined) {
+  if (status === "failed" || status === "error") return "bg-destructive"
+  if (status === "success") return "bg-emerald-500"
+  if (status === "running") return "bg-sky-500"
+  if (status === "skipped") return "bg-muted-foreground/50"
+  return "bg-muted-foreground/30"
 }
 
 function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
@@ -91,6 +84,40 @@ function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
     if (!next.includes(id)) next.push(id)
   }
   return next
+}
+
+function SlotConnector({
+  hasNext,
+  index,
+}: {
+  hasNext: boolean
+  index: number
+}) {
+  if (!hasNext) return null
+
+  const isLastInRow = (index + 1) % COLS === 0
+
+  if (isLastInRow) {
+    return (
+      <div
+        className="pointer-events-none absolute top-full left-1/2 flex h-10 w-0 -translate-x-1/2 flex-col items-center text-muted-foreground"
+        aria-hidden
+      >
+        <span className="w-px flex-1 bg-border" />
+        <ArrowDownIcon className="size-3.5 shrink-0" />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="pointer-events-none absolute top-1/2 -right-6 flex h-0 w-6 -translate-y-1/2 items-center text-muted-foreground"
+      aria-hidden
+    >
+      <span className="h-px flex-1 bg-border" />
+      <ArrowRightIcon className="size-3.5 shrink-0" />
+    </div>
+  )
 }
 
 export function CallList({ workflowId }: { workflowId: string }) {
@@ -152,48 +179,39 @@ export function CallList({ workflowId }: { workflowId: string }) {
     )
   }
 
+  const slotCount = orderedCalls.length + 1
+
   return (
     <section className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <h2 className="font-semibold">Calls</h2>
-        <Button size="sm" onClick={openCreate}>
-          New call
-        </Button>
-      </div>
+      <h2 className="font-semibold">Calls</h2>
 
       {callsQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : callsQuery.error ? (
         <p className="text-destructive">{callsQuery.error.message}</p>
-      ) : !orderedCalls.length ? (
-        <p className="text-muted-foreground">No calls yet.</p>
       ) : (
-        <AttachmentGroup className="items-center gap-0" role="list">
+        <div
+          className="grid grid-cols-5 gap-x-6 gap-y-10"
+          role="list"
+        >
           {orderedCalls.map((call, index) => {
             const method = (call.method ?? "?").toUpperCase()
+            const hasNext = index < slotCount - 1
+
             return (
               <div
                 key={call.id}
-                className="flex shrink-0 snap-start items-center"
+                className="relative min-w-0"
                 role="listitem"
               >
-                {index > 0 && (
-                  <div
-                    className="flex shrink-0 items-center px-1.5 text-muted-foreground"
-                    aria-hidden
-                  >
-                    <span className="h-px w-4 bg-border" />
-                    <ArrowRightIcon className="size-3.5" />
-                    <span className="h-px w-4 bg-border" />
-                  </div>
-                )}
                 <Attachment
                   state="idle"
-                  className={
+                  className={cn(
+                    "w-full max-w-none min-w-0",
                     draggingId === call.id
-                      ? "w-64 max-w-64 cursor-grabbing opacity-60 ring-1 ring-ring"
-                      : "w-64 max-w-64 cursor-grab"
-                  }
+                      ? "cursor-grabbing opacity-60 ring-1 ring-ring"
+                      : "cursor-grab"
+                  )}
                   draggable
                   onDragStart={(event) => {
                     setDraggingId(call.id)
@@ -226,26 +244,15 @@ export function CallList({ workflowId }: { workflowId: string }) {
                   <AttachmentMedia
                     title={method}
                     aria-label={method}
-                    className={`px-0.5 text-center text-[0.625rem] leading-none font-semibold ${methodMediaClass(call.method)}`}
+                    className={cn(
+                      "px-0.5 text-center text-[0.625rem] leading-none font-semibold",
+                      methodMediaClass(call.method)
+                    )}
                   >
                     {methodShortLabel(call.method)}
                   </AttachmentMedia>
                   <AttachmentContent>
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <AttachmentTitle className="flex-1">
-                        {call.name}
-                      </AttachmentTitle>
-                      {call.lastStatus && (
-                        <Badge
-                          variant="outline"
-                          className={`shrink-0 ${statusBadgeClass(call.lastStatus) ?? ""}`}
-                        >
-                          {call.lastHttpStatus != null
-                            ? `${formatRunStatusLabel(call.lastStatus)} · ${call.lastHttpStatus}`
-                            : formatRunStatusLabel(call.lastStatus)}
-                        </Badge>
-                      )}
-                    </div>
+                    <AttachmentTitle>{call.name}</AttachmentTitle>
                     <AttachmentDescription title={call.url}>
                       {call.url || "—"}
                     </AttachmentDescription>
@@ -265,11 +272,32 @@ export function CallList({ workflowId }: { workflowId: string }) {
                       <XIcon />
                     </AttachmentAction>
                   </AttachmentActions>
+                  <span
+                    className={cn(
+                      "relative z-20 size-2 shrink-0 self-center rounded-full",
+                      statusDotClass(call.lastStatus)
+                    )}
+                    title={call.lastStatus ?? "never run"}
+                    aria-label={call.lastStatus ?? "never run"}
+                  />
                 </Attachment>
+
+                <SlotConnector hasNext={hasNext} index={index} />
               </div>
             )
           })}
-        </AttachmentGroup>
+
+          <div className="relative min-w-0" role="listitem">
+            <button
+              type="button"
+              onClick={openCreate}
+              className="flex h-full min-h-14 w-full items-center justify-center gap-2 rounded-lg border border-dashed bg-card px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:ring-1 focus-visible:ring-ring/30 focus-visible:outline-none"
+            >
+              <PlusIcon className="size-4 shrink-0" />
+              Add call
+            </button>
+          </div>
+        </div>
       )}
 
       {deleteMutation.error && (
