@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { VariableText } from "@/components/variable/variable-text"
 import { useCalls, useCopyCall, useDeleteCall } from "@/lib/call/hooks"
-import type { Call } from "@/lib/call/types"
+import type { Call, CallRecentRun } from "@/lib/call/types"
 import { queryKeys } from "@/lib/query/keys"
 import { cn } from "@/lib/utils"
 import {
@@ -110,6 +110,56 @@ function formatLatency(ms: number | undefined) {
   return `${Math.round(ms)} ms`
 }
 
+const SPARK_MIN_PX = 3
+const SPARK_MAX_PX = 24
+
+function sparkBarClass(status: string | undefined) {
+  if (status === "success") return "bg-[#8FD2B0] dark:bg-emerald-400/80"
+  if (status === "failed") return "bg-orange-400 dark:bg-orange-400/90"
+  if (status === "error") return "bg-red-500 dark:bg-red-400"
+  if (status === "skipped") return "bg-muted-foreground/35"
+  if (status === "running") return "bg-sky-400"
+  return "bg-muted-foreground/30"
+}
+
+function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
+  if (!runs.length) return null
+
+  const maxLatency = Math.max(1, ...runs.map((run) => run.latencyMs ?? 0))
+
+  return (
+    <div
+      className="flex h-6 items-end gap-0.5"
+      role="img"
+      aria-label={`Latency of the last ${runs.length} runs`}
+    >
+      {runs.map((run) => {
+        const ratio = (run.latencyMs ?? 0) / maxLatency
+        const height = Math.max(SPARK_MIN_PX, Math.round(ratio * SPARK_MAX_PX))
+        const label = [
+          run.status,
+          run.latencyMs != null ? formatLatency(run.latencyMs) : null,
+          run.finishedAt ? new Date(run.finishedAt).toLocaleString() : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")
+
+        return (
+          <span
+            key={run.id}
+            title={label}
+            className={cn(
+              "block w-1 shrink-0 rounded-[1px]",
+              sparkBarClass(run.status)
+            )}
+            style={{ height }}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
 function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
   if (!localOrder) return serverIds
   const next = localOrder.filter((id) => serverIds.includes(id))
@@ -160,7 +210,6 @@ function CallCard({
 
   const method = (call.method ?? "GET").toUpperCase()
   const pill = statusPill(call.lastStatus)
-  const latency = formatLatency(call.lastLatencyMs)
 
   return (
     <div
@@ -186,7 +235,7 @@ function CallCard({
           overlay && "shadow-lg"
         )}
       >
-        <div className="flex flex-wrap items-center gap-3 px-[18px] py-3.5 sm:gap-4">
+        <div className="flex flex-wrap items-center gap-3 px-4.5 py-3.5 sm:gap-4">
           {!overlay && (
             <button
               type="button"
@@ -215,7 +264,7 @@ function CallCard({
           <button
             type="button"
             onClick={onOpen}
-            className="min-w-0 flex-1 basis-[260px] text-left"
+            className="min-w-0 flex-1 basis-65 text-left"
           >
             <span className="block truncate text-[15px] font-semibold text-foreground">
               {call.name}
@@ -226,23 +275,9 @@ function CallCard({
           </button>
 
           <div className="flex flex-wrap items-center gap-4 sm:gap-6">
-            {latency && (
-              <div className="flex min-w-14 flex-col gap-0.5">
-                <span className="text-xs text-muted-foreground">Latency</span>
-                <span className="text-sm font-semibold">{latency}</span>
-              </div>
+            {call.recentRuns && call.recentRuns.length > 0 && (
+              <LatencySparkline runs={call.recentRuns} />
             )}
-
-            <span
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium",
-                pill.className
-              )}
-              aria-label={call.lastStatus ?? "never run"}
-            >
-              <span className={cn("size-1.5 rounded-full", pill.dot)} />
-              {pill.label}
-            </span>
 
             <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
               <Button
@@ -361,7 +396,7 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const active = orderedCalls.find((call) => call.id === activeId)
 
   return (
-    <section className="container mx-auto mt-10 flex flex-col gap-5">
+    <section className="container mx-auto mt-10 flex max-w-4xl flex-col gap-5">
       {callsQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : callsQuery.error ? (

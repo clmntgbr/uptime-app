@@ -58,6 +58,16 @@ export interface CallInput {
   rules?: CallRule[]
 }
 
+/** One point in `Call.recentRuns` (oldest → newest, max 24). */
+export interface CallRecentRun {
+  id: string
+  runId: string
+  status: string
+  httpStatus?: number
+  finishedAt?: string
+  latencyMs?: number
+}
+
 export interface Call {
   id: string
   name: string
@@ -68,6 +78,8 @@ export interface Call {
   lastHttpStatus?: number
   lastFinishedAt?: string
   lastLatencyMs?: number
+  /** Last runs for this call, oldest first (max 24). */
+  recentRuns?: CallRecentRun[]
 }
 
 export interface CallDetail extends Call {
