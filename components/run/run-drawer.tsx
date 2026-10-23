@@ -1,6 +1,7 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
+import { DrawerFormSkeleton } from "@/components/ui/drawer-form-skeleton"
 import {
   Sheet,
   SheetContent,
@@ -244,7 +245,7 @@ export function RunDrawer({
         </SheetHeader>
 
         {runQuery.isLoading ? (
-          <p className="px-4 py-4 text-muted-foreground">Loading…</p>
+          <DrawerFormSkeleton fields={5} />
         ) : runQuery.error ? (
           <p className="px-4 py-4 text-destructive">{runQuery.error.message}</p>
         ) : runQuery.data ? (

@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { CallDrawerSkeleton } from "@/components/ui/drawer-form-skeleton"
 import {
   Sheet,
   SheetContent,
@@ -184,7 +185,7 @@ export function CallDrawer({
           </SheetHeader>
 
           {isEdit && callQuery.isLoading ? (
-            <p className="px-6 py-8 text-muted-foreground">Loading…</p>
+            <CallDrawerSkeleton />
           ) : isEdit && callQuery.error ? (
             <p className="px-6 py-8 text-destructive">
               {callQuery.error.message}

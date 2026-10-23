@@ -11,7 +11,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
 import { VariableText } from "@/components/variable/variable-text"
 import { useCalls, useCopyCall, useDeleteCall } from "@/lib/call/hooks"
 import type { Call, CallRecentRun } from "@/lib/call/types"
@@ -39,7 +38,12 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useQueryClient } from "@tanstack/react-query"
-import { CopyIcon, GripVerticalIcon, XIcon } from "lucide-react"
+import {
+  CopyIcon,
+  GripVerticalIcon,
+  PencilIcon,
+  Trash2Icon,
+} from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 
 const EMPTY_CALLS: Call[] = []
@@ -139,7 +143,7 @@ function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
         const label = [
           run.status,
           run.latencyMs != null ? formatLatency(run.latencyMs) : null,
-          run.finishedAt ? new Date(run.finishedAt).toLocaleString() : null,
+          run.finishedAt ?? null,
         ]
           .filter(Boolean)
           .join(" · ")
@@ -279,28 +283,61 @@ function CallCard({
               <LatencySparkline runs={call.recentRuns} />
             )}
 
-            <div className="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-9"
-                aria-label={`Duplicate ${call.name}`}
-                onClick={onDuplicate}
+            <div className="relative ml-auto h-8 min-w-20 shrink-0">
+              <div
+                className={cn(
+                  "absolute inset-y-0 right-0 flex items-center transition-opacity duration-200 group-focus-within:opacity-0 group-hover:opacity-0",
+                  !call.lastStatus && "invisible"
+                )}
               >
-                <CopyIcon className="size-4" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="size-9"
-                aria-label={`Delete ${call.name}`}
-                disabled={deleting}
-                onClick={onRemove}
-              >
-                <XIcon className="size-4" />
-              </Button>
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium",
+                    pill.className
+                  )}
+                  aria-label={call.lastStatus ?? "never run"}
+                >
+                  <span className={cn("size-1.5 rounded-full", pill.dot)} />
+                  {pill.label}
+                </span>
+              </div>
+
+              <div className="absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-full border border-border bg-background p-0.5 opacity-100 transition-opacity duration-200 ease-out sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+                <button
+                  type="button"
+                  aria-label={`Edit ${call.name}`}
+                  className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onOpen?.()
+                  }}
+                >
+                  <PencilIcon className="size-3.5" strokeWidth={1.6} />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Duplicate ${call.name}`}
+                  className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-500/10 dark:hover:text-sky-400"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onDuplicate?.()
+                  }}
+                >
+                  <CopyIcon className="size-3.5" strokeWidth={1.6} />
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Delete ${call.name}`}
+                  disabled={deleting}
+                  className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onRemove?.()
+                  }}
+                >
+                  <Trash2Icon className="size-3.5" strokeWidth={1.6} />
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
+import { DrawerFormSkeleton } from "@/components/ui/drawer-form-skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { VARIABLE_TEXT_CLASS } from "@/components/variable/variable-text"
@@ -176,7 +177,7 @@ function GlobalVariableDrawer({
         </SheetHeader>
 
         {isEdit && variableQuery.isLoading ? (
-          <p className="px-4 text-muted-foreground">Loading…</p>
+          <DrawerFormSkeleton fields={3} />
         ) : isEdit && variableQuery.error ? (
           <p className="px-4 text-destructive">{variableQuery.error.message}</p>
         ) : open ? (

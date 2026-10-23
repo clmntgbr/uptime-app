@@ -1,6 +1,7 @@
 "use client"
 
 import { DrawerFormActions } from "@/components/ui/drawer-form-actions"
+import { DrawerFormSkeleton } from "@/components/ui/drawer-form-skeleton"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -79,7 +80,7 @@ export function WorkflowDrawer({
         </SheetHeader>
 
         {isEdit && workflowQuery.isLoading ? (
-          <p className="px-4 text-muted-foreground">Loading…</p>
+          <DrawerFormSkeleton fields={3} />
         ) : isEdit && workflowQuery.error ? (
           <p className="px-4 text-destructive">{workflowQuery.error.message}</p>
         ) : open ? (

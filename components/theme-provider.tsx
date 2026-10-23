@@ -14,6 +14,7 @@ function ThemeProvider({
       forcedTheme="light"
       enableSystem={false}
       disableTransitionOnChange
+      scriptProps={{ type: "application/json" }}
       {...props}
     >
       {children}
