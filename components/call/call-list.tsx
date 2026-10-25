@@ -258,21 +258,13 @@ function CallCard({
               methodClass(call.method)
             )}
           >
-            {method === "DELETE"
-              ? "DEL"
-              : method === "OPTIONS"
-                ? "OPT"
-                : method}
+            {method}
           </span>
 
           <button
             type="button"
-            onClick={onOpen}
             className="min-w-0 flex-1 basis-65 text-left"
           >
-            <span className="block truncate text-[15px] font-semibold text-foreground">
-              {call.name}
-            </span>
             <span className="mt-1 block overflow-hidden font-mono text-[12.5px] leading-5 text-ellipsis whitespace-nowrap text-muted-foreground">
               <VariableText text={call.url || "—"} variant="chip" />
             </span>
@@ -290,19 +282,10 @@ function CallCard({
                   !call.lastStatus && "invisible"
                 )}
               >
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium",
-                    pill.className
-                  )}
-                  aria-label={call.lastStatus ?? "never run"}
-                >
-                  <span className={cn("size-1.5 rounded-full", pill.dot)} />
-                  {pill.label}
-                </span>
+                <span className={cn("size-1.5 rounded-full", pill.dot)} />
               </div>
 
-              <div className="absolute inset-y-0 right-0 flex items-center gap-0.5 rounded-full border border-border bg-background p-0.5 opacity-100 transition-opacity duration-200 ease-out sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
+              <div className="absolute inset-y-0 right-[-10px] flex items-center gap-0.5 rounded-full border border-border bg-background p-0.5 opacity-100 transition-opacity duration-200 ease-out sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
                 <button
                   type="button"
                   aria-label={`Edit ${call.name}`}
