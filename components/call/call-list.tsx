@@ -416,7 +416,7 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const active = orderedCalls.find((call) => call.id === activeId)
 
   return (
-    <section className="container mx-auto mt-10 flex max-w-4xl flex-col gap-5">
+    <section className="container mx-auto mt-10 flex max-w-6xl flex-col gap-5">
       {callsQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : callsQuery.error ? (
