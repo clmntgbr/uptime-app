@@ -350,7 +350,7 @@ function CallCard({
           overlay && "rounded-[14px] border border-border shadow-lg"
         )}
       >
-        <div className="flex flex-nowrap items-center gap-3 px-4 py-3">
+        <div className="flex flex-nowrap items-center gap-2 px-2 py-2">
           {!overlay && (
             <button
               type="button"
