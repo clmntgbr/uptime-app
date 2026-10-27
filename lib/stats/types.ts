@@ -12,8 +12,6 @@ export interface RunDayCounts {
   error: number
   skipped: number
   running: number
-  /** p95 of duration_ms for finished runs that day; null when none. */
-  latencyP95Ms: number | null
 }
 
 export interface RunCounts {
@@ -33,6 +31,8 @@ export interface CallDayCounts {
   failed: number
   error: number
   skipped: number
+  /** p95 of per-call timings.total that day; null when none finished. */
+  latencyP95Ms: number | null
 }
 
 export interface CallCounts {
@@ -42,6 +42,21 @@ export interface CallCounts {
   error: number
   skipped: number
   daily: CallDayCounts[]
+}
+
+/** Mean timings.total for one call on one UTC day. */
+export interface CallDurationPoint {
+  date: string
+  durationMs: number
+  samples: number
+}
+
+/** One call's mean duration over the history window. Stacking a day rebuilds the average run. */
+export interface CallDurationSeries {
+  id: string
+  name: string
+  position: number
+  daily: CallDurationPoint[]
 }
 
 /** Contiguous failed/error run range. `end` is null while the incident is still open. */
@@ -60,4 +75,5 @@ export interface DashboardStats {
   latencyP95Ms: number | null
   openIncident: boolean
   incidents: IncidentRange[]
+  callDurations: CallDurationSeries[]
 }

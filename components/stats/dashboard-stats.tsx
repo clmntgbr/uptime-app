@@ -213,7 +213,8 @@ export function DashboardStats({
 
       <StatsAreaChart
         runsDaily={runs.daily ?? []}
-        callsDaily={statsQuery.data.calls.daily ?? []}
+        callDurations={statsQuery.data.callDurations ?? []}
+        incidents={statsQuery.data.incidents ?? []}
       />
     </div>
   )

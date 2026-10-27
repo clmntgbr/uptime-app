@@ -1,68 +1,58 @@
 "use client"
 
 import * as React from "react"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  type BarShapeProps,
+} from "recharts"
 
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import {
   ChartContainer,
-  ChartLegend,
-  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import type { CallDayCounts, RunDayCounts } from "@/lib/stats/types"
+import { formatLatencyMs } from "@/lib/stats/format"
+import type {
+  CallDurationSeries,
+  IncidentRange,
+  RunDayCounts,
+} from "@/lib/stats/types"
+import { cn } from "@/lib/utils"
 
-const chartConfig = {
-  runsSuccess: {
-    label: "Run success",
-    color: "oklch(0.62 0.16 250)",
-  },
-  runsFailed: {
-    label: "Run failed",
-    color: "oklch(0.72 0.12 255)",
-  },
-  callsSuccess: {
-    label: "Calls success",
-    color: "oklch(0.68 0.15 150)",
-  },
-  callsFailed: {
-    label: "Calls failed",
-    color: "oklch(0.78 0.11 155)",
-  },
+const runsConfig = {
+  success: { label: "Success", color: "oklch(0.62 0.16 155)" },
+  failed: { label: "Failed", color: "oklch(0.63 0.2 25)" },
 } satisfies ChartConfig
 
-type TimeRange = "30d" | "7d" | "24h"
+const RANGES = [
+  { id: "hour", label: "Hour" },
+  { id: "day", label: "Day" },
+  { id: "week", label: "Week" },
+  { id: "month", label: "Month" },
+  { id: "6m", label: "6 months" },
+] as const
 
-type ChartDay = {
-  date: string
-  runsSuccess: number
-  runsFailed: number
-  callsSuccess: number
-  callsFailed: number
-}
+type TimeRange = (typeof RANGES)[number]["id"]
 
-function daysForRange(range: TimeRange) {
-  if (range === "7d") return 7
-  return 30
-}
-
-function emptyDay(date: string): ChartDay {
-  return {
-    date,
-    runsSuccess: 0,
-    runsFailed: 0,
-    callsSuccess: 0,
-    callsFailed: 0,
-  }
+type Bucket = {
+  key: string
+  label: string
+  start: string
+  end: string
+  success: number
+  failed: number
+  incident: boolean
 }
 
 function shiftUtcDate(date: string, deltaDays: number): string {
@@ -71,264 +61,457 @@ function shiftUtcDate(date: string, deltaDays: number): string {
   return next.toISOString().slice(0, 10)
 }
 
-function mergeDaily(
-  runsDaily: RunDayCounts[],
-  callsDaily: CallDayCounts[]
-): ChartDay[] {
-  const byDate = new Map<string, ChartDay>()
+function utcDay(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso.slice(0, 10)
+  return date.toISOString().slice(0, 10)
+}
 
-  for (const day of runsDaily) {
-    byDate.set(day.date, {
-      date: day.date,
-      runsSuccess: day.success,
-      runsFailed: day.failed + day.error,
-      callsSuccess: 0,
-      callsFailed: 0,
+function weekStart(date: string): string {
+  const next = new Date(`${date}T00:00:00Z`)
+  const day = next.getUTCDay() || 7
+  next.setUTCDate(next.getUTCDate() - day + 1)
+  return next.toISOString().slice(0, 10)
+}
+
+function formatDay(date: string) {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  })
+}
+
+function formatMonth(date: string) {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
+    month: "short",
+    timeZone: "UTC",
+  })
+}
+
+function overlapsIncident(
+  start: string,
+  end: string,
+  incidents: IncidentRange[]
+) {
+  return incidents.some((incident) => {
+    const incidentStart = utcDay(incident.start)
+    const incidentEnd = incident.end ? utcDay(incident.end) : "9999-12-31"
+    return incidentStart <= end && incidentEnd >= start
+  })
+}
+
+function windowDays(range: TimeRange, dates: string[]): string[] {
+  const end = dates.at(-1)
+  if (!end) return []
+  const dayWindow =
+    range === "hour" ? 1 : range === "day" ? 30 : range === "week" ? 84 : 183
+  const start = shiftUtcDate(end, -(dayWindow - 1))
+  return dates.filter((date) => date >= start && date <= end)
+}
+
+function buildBuckets(
+  range: TimeRange,
+  runsDaily: RunDayCounts[],
+  dates: string[],
+  incidents: IncidentRange[]
+): Bucket[] {
+  const runsByDate = new Map(runsDaily.map((day) => [day.date, day]))
+  const days = windowDays(range, dates)
+  if (days.length === 0) return []
+
+  if (range === "hour" || range === "day" || range === "6m") {
+    return days.map((date) => {
+      const run = runsByDate.get(date)
+      return {
+        key: date,
+        label: formatDay(date),
+        start: date,
+        end: date,
+        success: run?.success ?? 0,
+        failed: (run?.failed ?? 0) + (run?.error ?? 0),
+        incident: overlapsIncident(date, date, incidents),
+      }
     })
   }
 
-  for (const day of callsDaily) {
-    const existing = byDate.get(day.date)
-    if (existing) {
-      existing.callsSuccess = day.success
-      existing.callsFailed = day.failed + day.error
-    } else {
-      byDate.set(day.date, {
-        date: day.date,
-        runsSuccess: 0,
-        runsFailed: 0,
-        callsSuccess: day.success,
-        callsFailed: day.failed + day.error,
+  const groups = new Map<string, Bucket>()
+  for (const date of days) {
+    const key = range === "week" ? weekStart(date) : date.slice(0, 7)
+    const run = runsByDate.get(date)
+    const existing = groups.get(key)
+    if (!existing) {
+      groups.set(key, {
+        key,
+        label: range === "week" ? formatDay(key) : formatMonth(`${key}-01`),
+        start: date,
+        end: date,
+        success: run?.success ?? 0,
+        failed: (run?.failed ?? 0) + (run?.error ?? 0),
+        incident: false,
       })
+      continue
     }
+    existing.end = date
+    existing.success += run?.success ?? 0
+    existing.failed += (run?.failed ?? 0) + (run?.error ?? 0)
   }
 
-  return Array.from(byDate.values()).sort((a, b) =>
-    a.date.localeCompare(b.date)
+  return Array.from(groups.values()).map((bucket) => ({
+    ...bucket,
+    incident: overlapsIncident(bucket.start, bucket.end, incidents),
+  }))
+}
+
+function incidentBand(props: BarShapeProps) {
+  const background = props.background
+  const payload = props.payload as { incident?: boolean } | undefined
+  if (
+    !payload?.incident ||
+    background?.x == null ||
+    background.y == null ||
+    background.width == null ||
+    background.height == null
+  ) {
+    return <g />
+  }
+  return (
+    <rect
+      x={background.x}
+      y={background.y}
+      width={background.width}
+      height={background.height}
+      fill="oklch(0.63 0.2 25)"
+      fillOpacity={0.15}
+    />
   )
 }
 
-/** Yesterday / today / tomorrow, with today centered. */
-function windowAroundToday(merged: ChartDay[], today: string): ChartDay[] {
-  const byDate = new Map(merged.map((day) => [day.date, day]))
-  return [-1, 0, 1].map((offset) => {
-    const date = shiftUtcDate(today, offset)
-    return byDate.get(date) ?? emptyDay(date)
+function callColor(index: number, count: number) {
+  const t = count <= 1 ? 0.72 : index / (count - 1)
+  const lightness = 0.9 - t * 0.46
+  const chroma = 0.035 + t * 0.13
+  return `oklch(${lightness.toFixed(3)} ${chroma.toFixed(3)} 250)`
+}
+
+function seriesKey(id: string) {
+  return `call_${id.replace(/[^a-zA-Z0-9_]/g, "_")}`
+}
+
+type DurationCall = {
+  key: string
+  name: string
+  color: string
+}
+
+function bucketKeyFor(range: TimeRange, date: string) {
+  if (range === "week") return weekStart(date)
+  if (range === "month") return date.slice(0, 7)
+  return date
+}
+
+function buildDuration(
+  range: TimeRange,
+  series: CallDurationSeries[],
+  dates: string[],
+  incidents: IncidentRange[]
+): { rows: Record<string, string | number | boolean>[]; calls: DurationCall[] } {
+  const days = windowDays(range, dates)
+  if (days.length === 0) return { rows: [], calls: [] }
+
+  const daySet = new Set(days)
+  const buckets = new Map<
+    string,
+    { key: string; label: string; start: string; end: string }
+  >()
+  for (const date of days) {
+    const key = bucketKeyFor(range, date)
+    const existing = buckets.get(key)
+    if (!existing) {
+      buckets.set(key, {
+        key,
+        label:
+          range === "month" ? formatMonth(`${key}-01`) : formatDay(key),
+        start: date,
+        end: date,
+      })
+      continue
+    }
+    existing.end = date
+  }
+
+  const totals = new Map<string, Map<string, { duration: number; samples: number }>>()
+  const used = new Set<string>()
+  const ordered = [...series].sort(
+    (a, b) => a.position - b.position || a.name.localeCompare(b.name)
+  )
+
+  for (const call of ordered) {
+    const key = seriesKey(call.id)
+    for (const point of call.daily ?? []) {
+      if (!daySet.has(point.date) || point.samples <= 0) continue
+      const bucket = bucketKeyFor(range, point.date)
+      let calls = totals.get(bucket)
+      if (!calls) {
+        calls = new Map()
+        totals.set(bucket, calls)
+      }
+      const current = calls.get(key) ?? { duration: 0, samples: 0 }
+      current.duration += point.durationMs * point.samples
+      current.samples += point.samples
+      calls.set(key, current)
+      used.add(key)
+    }
+  }
+
+  const calls = ordered
+    .filter((call) => used.has(seriesKey(call.id)))
+    .map((call, index, visible) => ({
+      key: seriesKey(call.id),
+      name: call.name,
+      color: callColor(index, visible.length),
+    }))
+
+  const rows = Array.from(buckets.values()).map((bucket) => {
+    const row: Record<string, string | number | boolean> = {
+      key: bucket.key,
+      label: bucket.label,
+      incident: overlapsIncident(bucket.start, bucket.end, incidents),
+    }
+    const values = totals.get(bucket.key)
+    for (const call of calls) {
+      const value = values?.get(call.key)
+      if (value && value.samples > 0) {
+        row[call.key] = Math.round(value.duration / value.samples)
+      }
+    }
+    return row
   })
+
+  return { rows, calls }
+}
+
+function TimeRangeToggle({
+  value,
+  onChange,
+}: {
+  value: TimeRange
+  onChange: (value: TimeRange) => void
+}) {
+  return (
+    <div
+      className="inline-flex shrink-0 rounded-full border bg-background p-0.5"
+      role="group"
+      aria-label="Time range"
+    >
+      {RANGES.map((range) => (
+        <button
+          key={range.id}
+          type="button"
+          aria-pressed={value === range.id}
+          onClick={() => onChange(range.id)}
+          className={cn(
+            "rounded-full px-2.5 py-1 text-xs text-muted-foreground transition-colors",
+            value === range.id && "bg-muted font-medium text-foreground"
+          )}
+        >
+          {range.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export function StatsAreaChart({
   runsDaily,
-  callsDaily,
+  callDurations = [],
+  incidents = [],
 }: {
   runsDaily: RunDayCounts[]
-  callsDaily: CallDayCounts[]
+  callDurations?: CallDurationSeries[]
+  incidents?: IncidentRange[]
 }) {
-  const [timeRange, setTimeRange] = React.useState<TimeRange>("30d")
-  const gradientId = React.useId().replace(/:/g, "")
-
-  const filteredData = React.useMemo(() => {
-    const merged = mergeDaily(runsDaily, callsDaily)
-    if (merged.length === 0) return []
-
-    const today = merged.at(-1)?.date
-    if (!today) return []
-
-    if (timeRange === "24h") {
-      return windowAroundToday(merged, today)
+  const [runsRange, setRunsRange] = React.useState<TimeRange>("day")
+  const [durationRange, setDurationRange] = React.useState<TimeRange>("day")
+  const dates = React.useMemo(() => {
+    const keys = new Set(runsDaily.map((day) => day.date))
+    for (const call of callDurations) {
+      for (const point of call.daily ?? []) keys.add(point.date)
     }
-
-    const days = daysForRange(timeRange)
-    const start = shiftUtcDate(today, -(days - 1))
-    return merged.filter((day) => day.date >= start)
-  }, [runsDaily, callsDaily, timeRange])
+    return Array.from(keys).sort()
+  }, [runsDaily, callDurations])
+  const buckets = React.useMemo(
+    () => buildBuckets(runsRange, runsDaily, dates, incidents),
+    [runsRange, runsDaily, dates, incidents]
+  )
+  const duration = React.useMemo(
+    () => buildDuration(durationRange, callDurations, dates, incidents),
+    [durationRange, callDurations, dates, incidents]
+  )
+  const durationConfig = React.useMemo(
+    () =>
+      Object.fromEntries(
+        duration.calls.map((call) => [
+          call.key,
+          { label: call.name, color: call.color },
+        ])
+      ) satisfies ChartConfig,
+    [duration.calls]
+  )
+  const tickLabel = (value: unknown) => {
+    const key = String(value ?? "")
+    return buckets.find((bucket) => bucket.key === key)?.label ?? key
+  }
 
   return (
-    <Card className="pt-0">
-      <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
-        <div className="grid flex-1 gap-1"></div>
-        <Select
-          value={timeRange}
-          onValueChange={(value) => setTimeRange(value as TimeRange)}
-        >
-          <SelectTrigger
-            className="hidden w-[160px] rounded-lg sm:ms-auto sm:flex"
-            aria-label="Select time range"
-          >
-            <SelectValue placeholder="Last 30 days" />
-          </SelectTrigger>
-          <SelectContent className="rounded-xl">
-            <SelectItem value="30d" className="rounded-lg">
-              Last 30 days
-            </SelectItem>
-            <SelectItem value="7d" className="rounded-lg">
-              Last 7 days
-            </SelectItem>
-            <SelectItem value="24h" className="rounded-lg">
-              Last 24 hours
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </CardHeader>
-      <CardContent className="px-2 pt-4 sm:px-6 sm:pt-6">
-        <ChartContainer
-          config={chartConfig}
-          className="aspect-auto h-[250px] w-full"
-        >
-          <AreaChart
-            accessibilityLayer
-            data={filteredData}
-            margin={{ left: -20, right: 12 }}
-          >
-            <CartesianGrid vertical={false} />
-            <XAxis
-              dataKey="date"
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              minTickGap={32}
-              tickFormatter={(value) => {
-                const date = new Date(`${value}T00:00:00Z`)
-                return date.toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  timeZone: "UTC",
-                })
-              }}
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card className="pt-0">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 border-b py-4">
+            <CardTitle>Runs</CardTitle>
+            <TimeRangeToggle value={runsRange} onChange={setRunsRange} />
+          </CardHeader>
+          <CardContent className="px-2 pt-4 sm:px-4">
+            <ChartContainer
+              config={runsConfig}
+              className="aspect-auto h-[220px] w-full"
+            >
+              <BarChart data={buckets} accessibilityLayer>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="key"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  minTickGap={24}
+                  tickFormatter={tickLabel}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tickLine={false}
+                  axisLine={false}
+                  width={32}
+                />
+                <ChartTooltip
+                  content={<ChartTooltipContent labelFormatter={tickLabel} />}
+                />
+                <Bar
+                  dataKey="success"
+                  stackId="runs"
+                  fill="var(--color-success)"
+                  background={incidentBand}
+                />
+                <Bar
+                  dataKey="failed"
+                  stackId="runs"
+                  fill="var(--color-failed)"
+                  radius={[3, 3, 0, 0]}
+                />
+              </BarChart>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="pt-0">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 border-b py-4">
+            <CardTitle>Duration</CardTitle>
+            <TimeRangeToggle
+              value={durationRange}
+              onChange={setDurationRange}
             />
-            <YAxis
-              tickLine={false}
-              axisLine={false}
-              tickMargin={8}
-              tickCount={3}
-            />
-            <ChartTooltip
-              cursor={false}
-              content={
-                <ChartTooltipContent
-                  labelFormatter={(value) => {
-                    return new Date(`${value}T00:00:00Z`).toLocaleDateString(
-                      "en-US",
-                      {
-                        month: "short",
-                        day: "numeric",
-                        timeZone: "UTC",
-                      }
-                    )
+          </CardHeader>
+          <CardContent className="px-2 pt-4 sm:px-4">
+            <ChartContainer
+              config={durationConfig}
+              className="aspect-auto h-[220px] w-full"
+            >
+              <BarChart data={duration.rows} accessibilityLayer>
+                <CartesianGrid vertical={false} />
+                <XAxis
+                  dataKey="key"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
+                  minTickGap={24}
+                  tickFormatter={(value) => {
+                    const key = String(value ?? "")
+                    const row = duration.rows.find((item) => item.key === key)
+                    return typeof row?.label === "string" ? row.label : key
                   }}
                 />
-              }
-            />
-            <defs>
-              <linearGradient
-                id={`fillRunsSuccess-${gradientId}`}
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-runsSuccess)"
-                  stopOpacity={0.8}
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  width={48}
+                  tickFormatter={(value) => formatLatencyMs(Number(value))}
                 />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-runsSuccess)"
-                  stopOpacity={0.1}
+                <ChartTooltip
+                  content={
+                    <ChartTooltipContent
+                      labelFormatter={(value) => {
+                        const key = String(value ?? "")
+                        const row = duration.rows.find((item) => item.key === key)
+                        return typeof row?.label === "string" ? row.label : key
+                      }}
+                      formatter={(value, name, item) => {
+                        const key = String(
+                          (item as { dataKey?: unknown }).dataKey ?? name
+                        )
+                        const call = duration.calls.find((item) => item.key === key)
+                        return (
+                          <>
+                            <div
+                              className="size-2.5 shrink-0 rounded-[2px]"
+                              style={{ background: call?.color }}
+                            />
+                            <div className="flex flex-1 items-center justify-between gap-4 leading-none">
+                              <span className="text-muted-foreground">
+                                {call?.name ?? key}
+                              </span>
+                              <span className="font-medium text-foreground tabular-nums">
+                                {formatLatencyMs(Number(value))}
+                              </span>
+                            </div>
+                          </>
+                        )
+                      }}
+                    />
+                  }
                 />
-              </linearGradient>
-              <linearGradient
-                id={`fillRunsFailed-${gradientId}`}
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-runsFailed)"
-                  stopOpacity={0.8}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-runsFailed)"
-                  stopOpacity={0.1}
-                />
-              </linearGradient>
-              <linearGradient
-                id={`fillCallsSuccess-${gradientId}`}
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-callsSuccess)"
-                  stopOpacity={0.8}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-callsSuccess)"
-                  stopOpacity={0.1}
-                />
-              </linearGradient>
-              <linearGradient
-                id={`fillCallsFailed-${gradientId}`}
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="1"
-              >
-                <stop
-                  offset="5%"
-                  stopColor="var(--color-callsFailed)"
-                  stopOpacity={0.8}
-                />
-                <stop
-                  offset="95%"
-                  stopColor="var(--color-callsFailed)"
-                  stopOpacity={0.1}
-                />
-              </linearGradient>
-            </defs>
-            <Area
-              dataKey="runsFailed"
-              type="natural"
-              fill={`url(#fillRunsFailed-${gradientId})`}
-              fillOpacity={0.4}
-              stroke="var(--color-runsFailed)"
-              stackId="a"
-            />
-            <Area
-              dataKey="runsSuccess"
-              type="natural"
-              fill={`url(#fillRunsSuccess-${gradientId})`}
-              fillOpacity={0.4}
-              stroke="var(--color-runsSuccess)"
-              stackId="a"
-            />
-            <Area
-              dataKey="callsFailed"
-              type="natural"
-              fill={`url(#fillCallsFailed-${gradientId})`}
-              fillOpacity={0.4}
-              stroke="var(--color-callsFailed)"
-              stackId="a"
-            />
-            <Area
-              dataKey="callsSuccess"
-              type="natural"
-              fill={`url(#fillCallsSuccess-${gradientId})`}
-              fillOpacity={0.4}
-              stroke="var(--color-callsSuccess)"
-              stackId="a"
-            />
-            <ChartLegend content={<ChartLegendContent />} />
-          </AreaChart>
-        </ChartContainer>
-      </CardContent>
-    </Card>
+                {duration.calls.map((call, index) => (
+                  <Bar
+                    key={call.key}
+                    dataKey={call.key}
+                    stackId="duration"
+                    fill={call.color}
+                    background={index === 0 ? incidentBand : undefined}
+                    radius={
+                      index === duration.calls.length - 1
+                        ? [3, 3, 0, 0]
+                        : undefined
+                    }
+                  />
+                ))}
+              </BarChart>
+            </ChartContainer>
+            {duration.calls.length > 0 ? (
+              <ul className="flex flex-wrap gap-x-4 gap-y-1 px-2 pt-3 text-xs text-muted-foreground">
+                {duration.calls.map((call) => (
+                  <li key={call.key} className="flex items-center gap-1.5">
+                    <span
+                      className="size-2.5 rounded-[2px]"
+                      style={{ background: call.color }}
+                    />
+                    {call.name}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-2 pt-3 text-xs text-muted-foreground">
+                No call durations in this range.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+    </div>
   )
 }
