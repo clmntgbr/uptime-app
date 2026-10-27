@@ -58,6 +58,14 @@ export interface CallInput {
   rules?: CallRule[]
 }
 
+/** Phase breakdown of one sparkline bar, in milliseconds. */
+export interface CallRecentRunTimings {
+  dns: number
+  connect: number
+  tls: number
+  transfer: number
+}
+
 /** One point in `Call.recentRuns` (oldest → newest, max 24). */
 export interface CallRecentRun {
   id: string
@@ -66,6 +74,7 @@ export interface CallRecentRun {
   httpStatus?: number
   finishedAt?: string
   latencyMs?: number
+  timings?: CallRecentRunTimings
 }
 
 export interface Call {

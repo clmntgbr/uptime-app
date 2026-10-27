@@ -11,8 +11,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card"
 import { VariableText } from "@/components/variable/variable-text"
 import { useCalls, useCopyCall, useDeleteCall } from "@/lib/call/hooks"
+import {
+  useGlobalVariables,
+  useStaticVariables,
+} from "@/lib/variable/hooks"
 import type { Call, CallRecentRun } from "@/lib/call/types"
 import { queryKeys } from "@/lib/query/keys"
 import { cn } from "@/lib/utils"
@@ -108,12 +117,6 @@ function statusPill(status: string | undefined) {
   }
 }
 
-function formatLatency(ms: number | undefined) {
-  if (ms == null) return null
-  if (ms >= 1000) return `${(ms / 1000).toFixed(1)} s`
-  return `${Math.round(ms)} ms`
-}
-
 const SPARK_MIN_PX = 3
 const SPARK_MAX_PX = 24
 
@@ -124,6 +127,53 @@ function sparkBarClass(status: string | undefined) {
   if (status === "skipped") return "bg-muted-foreground/35"
   if (status === "running") return "bg-sky-400"
   return "bg-muted-foreground/30"
+}
+
+function formatTimingMs(ms: number) {
+  if (!Number.isFinite(ms)) return "—"
+  if (Math.abs(ms) < 1000) return `${Math.round(ms)}ms`
+  const seconds = ms / 1000
+  return `${seconds >= 10 ? seconds.toFixed(0) : seconds.toFixed(1)}s`
+}
+
+function formatHoverStamp(iso: string | undefined) {
+  if (!iso) return null
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return null
+  const time = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short",
+  })
+  const day = date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  })
+  return `${time} · ${day}`
+}
+
+function timingRows(run: CallRecentRun) {
+  const dns = run.timings?.dns ?? 0
+  const connect = run.timings?.connect ?? 0
+  const tls = run.timings?.tls ?? 0
+  const transfer = run.timings?.transfer ?? 0
+  const waiting = Math.max(
+    0,
+    (run.latencyMs ?? 0) - dns - connect - tls - transfer
+  )
+  return [
+    { key: "dns", label: "Name lookup", swatch: "bg-violet-500", ms: dns },
+    { key: "connect", label: "Connection", swatch: "bg-blue-500", ms: connect },
+    { key: "tls", label: "TLS handshake", swatch: "bg-teal-400", ms: tls },
+    { key: "waiting", label: "Waiting", swatch: "bg-amber-400", ms: waiting },
+    {
+      key: "transfer",
+      label: "Data transfer",
+      swatch: "bg-emerald-500",
+      ms: transfer,
+    },
+  ]
 }
 
 function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
@@ -140,24 +190,88 @@ function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
       {runs.map((run) => {
         const ratio = (run.latencyMs ?? 0) / maxLatency
         const height = Math.max(SPARK_MIN_PX, Math.round(ratio * SPARK_MAX_PX))
-        const label = [
-          run.status,
-          run.latencyMs != null ? formatLatency(run.latencyMs) : null,
-          run.finishedAt ?? null,
-        ]
-          .filter(Boolean)
-          .join(" · ")
+        const total = run.latencyMs != null ? formatTimingMs(run.latencyMs) : null
+        const stamp = formatHoverStamp(run.finishedAt)
+        const status =
+          run.status.charAt(0).toUpperCase() + run.status.slice(1)
+        const phases = timingRows(run)
+        const phaseMax = Math.max(1, ...phases.map((phase) => phase.ms))
 
         return (
-          <span
-            key={run.id}
-            title={label}
-            className={cn(
-              "block w-1 shrink-0 rounded-[1px]",
-              sparkBarClass(run.status)
-            )}
-            style={{ height }}
-          />
+          <HoverCard key={run.id} openDelay={120} closeDelay={80}>
+            <HoverCardTrigger asChild>
+              <button
+                type="button"
+                className="flex h-6 w-1.5 items-end justify-center"
+                aria-label={[stamp, total, run.status].filter(Boolean).join(", ")}
+              >
+                <span
+                  className={cn(
+                    "block w-1 rounded-[1px]",
+                    sparkBarClass(run.status)
+                  )}
+                  style={{ height }}
+                />
+              </button>
+            </HoverCardTrigger>
+            <HoverCardContent side="top" className="w-64 p-3">
+              <div className="flex flex-col gap-3">
+                {stamp && (
+                  <p className="text-[11px] text-muted-foreground">{stamp}</p>
+                )}
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="flex items-center gap-1.5 font-medium text-foreground">
+                    <span
+                      className={cn(
+                        "size-1.5 rounded-full",
+                        sparkBarClass(run.status)
+                      )}
+                    />
+                    {status}
+                  </span>
+                  {run.httpStatus != null && (
+                    <span className="text-muted-foreground">
+                      HTTP {run.httpStatus}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col">
+                  <p className="text-2xl font-semibold tracking-tight text-foreground">
+                    {total ?? "—"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Total</p>
+                </div>
+                <div className="flex flex-col gap-2 border-t border-border pt-2.5">
+                  {phases.map((phase) => {
+                    const ms = phase.ms
+                    const width = Math.round((ms / phaseMax) * 100)
+                    return (
+                      <div key={phase.key} className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 text-xs">
+                          <span
+                            className={cn(
+                              "size-2 shrink-0 rounded-[2px]",
+                              phase.swatch
+                            )}
+                          />
+                          <span className="min-w-0 flex-1">{phase.label}</span>
+                          <span className="tabular-nums text-muted-foreground">
+                            {formatTimingMs(ms)}
+                          </span>
+                        </div>
+                        <div className="h-1 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className={cn("h-full rounded-full", phase.swatch)}
+                            style={{ width: `${ms > 0 ? Math.max(width, 6) : 0}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </HoverCardContent>
+          </HoverCard>
         )
       })}
     </div>
@@ -175,18 +289,16 @@ function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
 
 function CallCard({
   call,
-  index,
-  hasNext,
   overlay,
+  variableValues,
   onOpen,
   onRemove,
   onDuplicate,
   deleting,
 }: {
   call: Call
-  index: number
-  hasNext?: boolean
   overlay?: boolean
+  variableValues?: Record<string, string>
   onOpen?: () => void
   onRemove?: () => void
   onDuplicate?: () => void
@@ -227,19 +339,18 @@ function CallCard({
             }
       }
       className={cn(
-        "flex gap-4",
-        !overlay && hasNext && "pb-3",
+        "flex",
         overlay && "scale-[1.01]",
         isDragging && !overlay && "opacity-50"
       )}
     >
       <div
         className={cn(
-          "group min-w-0 flex-1 overflow-hidden rounded-[14px] border border-border bg-background",
-          overlay && "shadow-lg"
+          "group min-w-0 flex-1 overflow-hidden bg-white",
+          overlay && "rounded-[14px] border border-border shadow-lg"
         )}
       >
-        <div className="flex flex-wrap items-center gap-3 px-4.5 py-3.5 sm:gap-4">
+        <div className="flex flex-nowrap items-center gap-3 px-4 py-3">
           {!overlay && (
             <button
               type="button"
@@ -261,16 +372,17 @@ function CallCard({
             {method}
           </span>
 
-          <button
-            type="button"
-            className="min-w-0 flex-1 basis-65 text-left"
-          >
-            <span className="mt-1 block overflow-hidden font-mono text-[12.5px] leading-5 text-ellipsis whitespace-nowrap text-muted-foreground">
-              <VariableText text={call.url || "—"} variant="chip" />
+          <div className="min-w-0 flex-1 text-left">
+            <span className="block truncate font-mono text-[12.5px] leading-5 text-muted-foreground">
+              <VariableText
+                text={call.url || "—"}
+                variant="chip"
+                values={variableValues}
+              />
             </span>
-          </button>
+          </div>
 
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+          <div className="flex shrink-0 flex-nowrap items-center gap-4">
             {call.recentRuns && call.recentRuns.length > 0 && (
               <LatencySparkline runs={call.recentRuns} />
             )}
@@ -338,8 +450,21 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const [callToDelete, setCallToDelete] = useState<Call | null>(null)
 
   const callsQuery = useCalls(workflowId)
+  const globalsQuery = useGlobalVariables()
+  const staticsQuery = useStaticVariables(workflowId)
   const deleteMutation = useDeleteCall(workflowId)
   const copyMutation = useCopyCall(workflowId)
+
+  const variableValues = useMemo(() => {
+    const values: Record<string, string> = {}
+    for (const variable of globalsQuery.data ?? []) {
+      if (variable.value) values[variable.name] = variable.value
+    }
+    for (const variable of staticsQuery.data ?? []) {
+      if (variable.value) values[variable.name] = variable.value
+    }
+    return values
+  }, [globalsQuery.data, staticsQuery.data])
 
   const calls = callsQuery.data ?? EMPTY_CALLS
 
@@ -416,7 +541,7 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const active = orderedCalls.find((call) => call.id === activeId)
 
   return (
-    <section className="container mx-auto mt-10 flex max-w-6xl flex-col gap-5">
+    <section className="container mx-auto mt-6 flex max-w-6xl flex-col">
       {callsQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : callsQuery.error ? (
@@ -433,30 +558,31 @@ export function CallList({ workflowId }: { workflowId: string }) {
             items={orderedCalls.map((call) => call.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ol className="flex flex-col">
-              {orderedCalls.map((call, index) => (
-                <li key={call.id} className="list-none">
-                  <CallCard
-                    call={call}
-                    index={index}
-                    hasNext
-                    onOpen={() => openEdit(call.id)}
-                    onRemove={() => setCallToDelete(call)}
-                    onDuplicate={() => handleDuplicate(call)}
-                    deleting={
-                      deleteMutation.isPending &&
-                      deleteMutation.variables === call.id
-                    }
-                  />
-                </li>
-              ))}
-            </ol>
+            <div className="overflow-hidden rounded-xl border border-[#e6e8ef] bg-white">
+              <ol className="flex flex-col divide-y divide-[#eef0f4]">
+                {orderedCalls.map((call) => (
+                  <li key={call.id} className="list-none">
+                    <CallCard
+                      call={call}
+                      variableValues={variableValues}
+                      onOpen={() => openEdit(call.id)}
+                      onRemove={() => setCallToDelete(call)}
+                      onDuplicate={() => handleDuplicate(call)}
+                      deleting={
+                        deleteMutation.isPending &&
+                        deleteMutation.variables === call.id
+                      }
+                    />
+                  </li>
+                ))}
+              </ol>
+            </div>
           </SortableContext>
           <DragOverlay dropAnimation={DROP_ANIMATION}>
             {active ? (
               <CallCard
                 call={active}
-                index={orderedCalls.findIndex((c) => c.id === active.id)}
+                variableValues={variableValues}
                 overlay
               />
             ) : null}

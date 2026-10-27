@@ -63,7 +63,7 @@ export function AppShell({
             <HeaderUserButton />
           </div>
         </header>
-        <div className="@container/main flex flex-1 flex-col gap-4 bg-muted/40 p-4 pt-0">
+        <div className="@container/main flex flex-1 flex-col gap-4 bg-[#f8f9fc] p-4 pt-0">
           {children}
         </div>
       </SidebarInset>
