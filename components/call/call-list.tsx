@@ -17,13 +17,17 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
 import { VariableText } from "@/components/variable/variable-text"
-import { useCalls, useCopyCall, useDeleteCall } from "@/lib/call/hooks"
+import {
+  useCalls,
+  useCopyCall,
+  useDeleteCall,
+  useReorderCalls,
+} from "@/lib/call/hooks"
 import {
   useGlobalVariables,
   useStaticVariables,
 } from "@/lib/variable/hooks"
 import type { Call, CallRecentRun } from "@/lib/call/types"
-import { queryKeys } from "@/lib/query/keys"
 import { cn } from "@/lib/utils"
 import {
   DndContext,
@@ -46,7 +50,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { useQueryClient } from "@tanstack/react-query"
 import {
   CopyIcon,
   GripVerticalIcon,
@@ -278,15 +281,6 @@ function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
   )
 }
 
-function mergeCallOrder(serverIds: string[], localOrder: string[] | null) {
-  if (!localOrder) return serverIds
-  const next = localOrder.filter((id) => serverIds.includes(id))
-  for (const id of serverIds) {
-    if (!next.includes(id)) next.push(id)
-  }
-  return next
-}
-
 function CallCard({
   call,
   overlay,
@@ -442,10 +436,8 @@ function CallCard({
 }
 
 export function CallList({ workflowId }: { workflowId: string }) {
-  const queryClient = useQueryClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editedId, setEditedId] = useState<string | null>(null)
-  const [localOrder, setLocalOrder] = useState<string[] | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [callToDelete, setCallToDelete] = useState<Call | null>(null)
 
@@ -454,6 +446,7 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const staticsQuery = useStaticVariables(workflowId)
   const deleteMutation = useDeleteCall(workflowId)
   const copyMutation = useCopyCall(workflowId)
+  const reorderMutation = useReorderCalls(workflowId)
 
   const variableValues = useMemo(() => {
     const values: Record<string, string> = {}
@@ -468,17 +461,11 @@ export function CallList({ workflowId }: { workflowId: string }) {
 
   const calls = callsQuery.data ?? EMPTY_CALLS
 
-  const orderedCalls = useMemo(() => {
-    const byPosition = [...calls].sort(
-      (a, b) => (a.position ?? 0) - (b.position ?? 0)
-    )
-    const serverIds = byPosition.map((call) => call.id)
-    const ids = mergeCallOrder(serverIds, localOrder)
-    const byId = new Map(calls.map((call) => [call.id, call]))
-    return ids
-      .map((id) => byId.get(id))
-      .filter((call): call is Call => call != null)
-  }, [calls, localOrder])
+  const orderedCalls = useMemo(
+    () =>
+      [...calls].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    [calls]
+  )
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -509,20 +496,6 @@ export function CallList({ workflowId }: { workflowId: string }) {
     copyMutation.mutate(call.id)
   }
 
-  const applyOrder = (next: string[]) => {
-    setLocalOrder(next)
-    queryClient.setQueryData<Call[]>(
-      queryKeys.calls.list(workflowId),
-      (old) => {
-        if (!old) return old
-        const byId = new Map(old.map((call) => [call.id, call]))
-        return next
-          .map((id) => byId.get(id))
-          .filter((call): call is Call => call != null)
-      }
-    )
-  }
-
   const onDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id))
   }
@@ -535,13 +508,13 @@ export function CallList({ workflowId }: { workflowId: string }) {
     const from = ids.indexOf(String(active.id))
     const to = ids.indexOf(String(over.id))
     if (from < 0 || to < 0) return
-    applyOrder(arrayMove(ids, from, to))
+    reorderMutation.mutate(arrayMove(ids, from, to))
   }
 
   const active = orderedCalls.find((call) => call.id === activeId)
 
   return (
-    <section className="container mx-auto mt-6 flex max-w-6xl flex-col">
+    <section className="container mx-auto flex max-w-6xl flex-col">
       {callsQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : callsQuery.error ? (

@@ -92,3 +92,24 @@ export const copyCall = async (
 
   return response.json()
 }
+
+/** PUT /api/workflows/:id/calls/reorder — callIds must be an exact permutation. */
+export const reorderCalls = async (
+  workflowId: string,
+  callIds: string[]
+): Promise<Call[]> => {
+  const response = await fetch(
+    `/api/workflows/${workflowId}/calls/reorder`,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callIds }),
+    }
+  )
+
+  if (!response.ok) {
+    throw await parseApiError(response, "Failed to reorder calls")
+  }
+
+  return response.json()
+}

@@ -1,4 +1,5 @@
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { QueryProvider } from "@/lib/query/provider"
 import { cn } from "@/lib/utils"
@@ -46,7 +47,10 @@ export default function RootLayout({
         >
           <ThemeProvider>
             <QueryProvider>
-              <TooltipProvider>{children}</TooltipProvider>
+              <TooltipProvider>
+                {children}
+                <Toaster richColors closeButton position="top-right" />
+              </TooltipProvider>
             </QueryProvider>
           </ThemeProvider>
         </ClerkProvider>
