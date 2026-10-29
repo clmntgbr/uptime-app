@@ -1,6 +1,7 @@
 "use client"
 
 import { AppSidebar } from "@/components/app-sidebar"
+import { ThemeToggle } from "@/components/theme-toggle"
 import { Separator } from "@/components/ui/separator"
 import {
   SidebarInset,
@@ -53,17 +54,18 @@ export function AppShell({
     >
       <AppSidebar />
       <SidebarInset>
-        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background px-4">
+        <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-card px-4">
           <SidebarTrigger className="-ms-1" />
           <Separator
             orientation="vertical"
             className="me-2 data-vertical:h-6 data-vertical:self-auto"
           />
-          <div className="ms-auto flex h-full items-center">
+          <div className="ms-auto flex h-full items-center gap-1">
+            <ThemeToggle />
             <HeaderUserButton />
           </div>
         </header>
-        <div className="@container/main flex flex-1 flex-col gap-4 bg-[#f8f9fc] p-4 pt-0">
+        <div className="@container/main flex flex-1 flex-col gap-4 bg-muted/40 p-4 pt-0">
           {children}
         </div>
       </SidebarInset>

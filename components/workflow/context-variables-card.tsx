@@ -95,7 +95,7 @@ export function ContextVariablesCard({
   return (
     <Card
       size="sm"
-      className="bg-white"
+      className="bg-card"
       role="region"
       aria-labelledby={titleId}
     >

@@ -157,16 +157,34 @@ function LastRunStatCard({
   )
 }
 
+export function DashboardCharts({ workflowId }: { workflowId?: string } = {}) {
+  const statsQuery = useDashboardStats(workflowId)
+
+  if (statsQuery.isLoading || statsQuery.error || !statsQuery.data) {
+    return null
+  }
+
+  return (
+    <StatsAreaChart
+      runsDaily={statsQuery.data.runs.daily ?? []}
+      callDurations={statsQuery.data.callDurations ?? []}
+      incidents={statsQuery.data.incidents ?? []}
+    />
+  )
+}
+
 export function DashboardStats({
   workflowId,
   lastRunAt,
   lastStatus,
   isRunning = false,
+  showCharts = true,
 }: {
   workflowId?: string
   lastRunAt?: string
   lastStatus?: string
   isRunning?: boolean
+  showCharts?: boolean
 } = {}) {
   const statsQuery = useDashboardStats(workflowId)
 
@@ -211,11 +229,13 @@ export function DashboardStats({
         )}
       </div>
 
-      <StatsAreaChart
-        runsDaily={runs.daily ?? []}
-        callDurations={statsQuery.data.callDurations ?? []}
-        incidents={statsQuery.data.incidents ?? []}
-      />
+      {showCharts ? (
+        <StatsAreaChart
+          runsDaily={runs.daily ?? []}
+          callDurations={statsQuery.data.callDurations ?? []}
+          incidents={statsQuery.data.incidents ?? []}
+        />
+      ) : null}
     </div>
   )
 }

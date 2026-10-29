@@ -1,13 +1,12 @@
 "use client"
 
-import { CallList } from "@/components/call/call-list"
 import { RunList } from "@/components/run/run-list"
-import { DashboardStats } from "@/components/stats/dashboard-stats"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { WorkflowContextColumn } from "@/components/workflow/context-column"
+import { WorkflowCharts } from "@/components/workflow/workflow-charts"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
+import { WorkflowStats } from "@/components/workflow/workflow-stats"
 import { ApiError } from "@/lib/api-error"
 import {
   useRunWorkflow,
@@ -112,7 +111,7 @@ export default function WorkflowPage() {
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-0">
-      <div className="sticky top-16 z-10 -mx-4 border-b bg-background px-4">
+      <div className="sticky top-16 z-10 -mx-4 border-b bg-card px-4">
         <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2">
           <div className="flex min-w-0 items-center gap-1.5 justify-self-start">
             <Link
@@ -185,7 +184,7 @@ export default function WorkflowPage() {
 
       <TabsContent
         value="overview"
-        className="flex flex-col gap-4 pt-4 text-sm"
+        className="flex flex-col gap-4 pt-4 text-sm container max-w-8xl mx-auto"
       >
         {runMutation.error && (
           <p className="text-destructive">
@@ -201,18 +200,13 @@ export default function WorkflowPage() {
           <p className="text-destructive">{updateMutation.error.message}</p>
         )}
 
-        <DashboardStats
+        <WorkflowStats
           workflowId={workflow.id}
           lastRunAt={workflow.lastRunAt}
           lastStatus={workflow.lastStatus}
           isRunning={workflow.isRunning}
         />
-        <div className="flex flex-col gap-4 min-[900px]:flex-row min-[900px]:items-start">
-          <div className="min-w-0 flex-1">
-            <CallList workflowId={workflow.id} />
-          </div>
-          <WorkflowContextColumn workflowId={workflow.id} />
-        </div>
+        <WorkflowCharts workflowId={workflow.id} />
       </TabsContent>
 
       <TabsContent value="runs" className="pt-4 text-sm">

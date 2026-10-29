@@ -126,7 +126,7 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
   return (
     <Card
       size="sm"
-      className="bg-white"
+      className="bg-card"
       role="region"
       aria-labelledby={titleId}
     >

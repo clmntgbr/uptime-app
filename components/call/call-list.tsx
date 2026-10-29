@@ -11,11 +11,30 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRoot,
+  TableRow,
+} from "@/components/ui/table"
 import { VariableText } from "@/components/variable/variable-text"
 import {
   useCalls,
@@ -23,11 +42,11 @@ import {
   useDeleteCall,
   useReorderCalls,
 } from "@/lib/call/hooks"
+import type { Call, CallRecentRun } from "@/lib/call/types"
 import {
   useGlobalVariables,
   useStaticVariables,
 } from "@/lib/variable/hooks"
-import type { Call, CallRecentRun } from "@/lib/call/types"
 import { cn } from "@/lib/utils"
 import {
   DndContext,
@@ -52,11 +71,18 @@ import {
 import { CSS } from "@dnd-kit/utilities"
 import {
   CopyIcon,
+  EllipsisIcon,
   GripVerticalIcon,
   PencilIcon,
+  PlusIcon,
   Trash2Icon,
 } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ButtonHTMLAttributes,
+} from "react"
 
 const EMPTY_CALLS: Call[] = []
 
@@ -65,6 +91,18 @@ const DROP_ANIMATION: DropAnimation = {
     styles: { active: { opacity: "0.5" } },
   }),
 }
+
+/** Fixed column widths so the row keeps its layout while dragging. */
+const COL = {
+  grip: "w-10",
+  method: "w-16",
+  spark: "w-36",
+  status: "w-28",
+  actions: "w-10",
+} as const
+
+const SPARK_MIN_PX = 3
+const SPARK_MAX_PX = 24
 
 function methodClass(method: string | undefined) {
   switch ((method ?? "").toUpperCase()) {
@@ -83,45 +121,21 @@ function methodClass(method: string | undefined) {
   }
 }
 
-function statusPill(status: string | undefined) {
+function statusBadge(status: string | undefined) {
   if (status === "success") {
-    return {
-      label: "OK",
-      className:
-        "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-      dot: "bg-emerald-500",
-    }
+    return { label: "Success", variant: "secondary" as const }
   }
   if (status === "failed" || status === "error") {
-    return {
-      label: "Failed",
-      className: "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-300",
-      dot: "bg-destructive",
-    }
+    return { label: "Failed", variant: "destructive" as const }
   }
   if (status === "running") {
-    return {
-      label: "Running",
-      className: "bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-300",
-      dot: "bg-sky-500",
-    }
+    return { label: "Running", variant: "default" as const }
   }
   if (status === "skipped") {
-    return {
-      label: "Skipped",
-      className: "bg-muted text-muted-foreground",
-      dot: "bg-muted-foreground/50",
-    }
+    return { label: "Skipped", variant: "outline" as const }
   }
-  return {
-    label: "Never",
-    className: "bg-muted text-muted-foreground",
-    dot: "bg-muted-foreground/40",
-  }
+  return { label: "Never", variant: "outline" as const }
 }
-
-const SPARK_MIN_PX = 3
-const SPARK_MAX_PX = 24
 
 function sparkBarClass(status: string | undefined) {
   if (status === "success") return "bg-[#8FD2B0] dark:bg-emerald-400/80"
@@ -193,7 +207,8 @@ function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
       {runs.map((run) => {
         const ratio = (run.latencyMs ?? 0) / maxLatency
         const height = Math.max(SPARK_MIN_PX, Math.round(ratio * SPARK_MAX_PX))
-        const total = run.latencyMs != null ? formatTimingMs(run.latencyMs) : null
+        const total =
+          run.latencyMs != null ? formatTimingMs(run.latencyMs) : null
         const stamp = formatHoverStamp(run.finishedAt)
         const status =
           run.status.charAt(0).toUpperCase() + run.status.slice(1)
@@ -206,7 +221,9 @@ function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
               <button
                 type="button"
                 className="flex h-6 w-1.5 items-end justify-center"
-                aria-label={[stamp, total, run.status].filter(Boolean).join(", ")}
+                aria-label={[stamp, total, run.status]
+                  .filter(Boolean)
+                  .join(", ")}
               >
                 <span
                   className={cn(
@@ -246,8 +263,7 @@ function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
                 </div>
                 <div className="flex flex-col gap-2 border-t border-border pt-2.5">
                   {phases.map((phase) => {
-                    const ms = phase.ms
-                    const width = Math.round((ms / phaseMax) * 100)
+                    const width = Math.round((phase.ms / phaseMax) * 100)
                     return (
                       <div key={phase.key} className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 text-xs">
@@ -259,13 +275,15 @@ function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
                           />
                           <span className="min-w-0 flex-1">{phase.label}</span>
                           <span className="tabular-nums text-muted-foreground">
-                            {formatTimingMs(ms)}
+                            {formatTimingMs(phase.ms)}
                           </span>
                         </div>
                         <div className="h-1 overflow-hidden rounded-full bg-muted">
                           <div
                             className={cn("h-full rounded-full", phase.swatch)}
-                            style={{ width: `${ms > 0 ? Math.max(width, 6) : 0}%` }}
+                            style={{
+                              width: `${phase.ms > 0 ? Math.max(width, 6) : 0}%`,
+                            }}
                           />
                         </div>
                       </div>
@@ -281,10 +299,24 @@ function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
   )
 }
 
-function CallCard({
+function CallTableColgroup() {
+  return (
+    <colgroup>
+      <col className={COL.grip} />
+      <col className={COL.method} />
+      <col />
+      <col className={COL.spark} />
+      <col className={COL.status} />
+      <col className={COL.actions} />
+    </colgroup>
+  )
+}
+
+function CallCells({
   call,
   overlay,
   variableValues,
+  dragHandleProps,
   onOpen,
   onRemove,
   onDuplicate,
@@ -293,9 +325,118 @@ function CallCard({
   call: Call
   overlay?: boolean
   variableValues?: Record<string, string>
+  dragHandleProps?: ButtonHTMLAttributes<HTMLButtonElement>
   onOpen?: () => void
   onRemove?: () => void
   onDuplicate?: () => void
+  deleting?: boolean
+}) {
+  const method = (call.method ?? "GET").toUpperCase()
+  const status = statusBadge(call.lastStatus)
+
+  return (
+    <>
+      <TableCell className={cn(COL.grip, "px-1")}>
+        {!overlay ? (
+          <button
+            type="button"
+            {...dragHandleProps}
+            aria-label={`Reorder ${call.name}`}
+            className="flex size-8 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground active:cursor-grabbing"
+          >
+            <GripVerticalIcon className="size-4" />
+          </button>
+        ) : (
+          <span className="flex size-8 items-center justify-center text-muted-foreground/50">
+            <GripVerticalIcon className="size-4" />
+          </span>
+        )}
+      </TableCell>
+      <TableCell className={COL.method}>
+        <span
+          title={method}
+          className={cn(
+            "inline-flex h-6 w-14 items-center justify-center rounded-md font-mono text-[0.625rem] font-semibold",
+            methodClass(call.method)
+          )}
+        >
+          {method}
+        </span>
+      </TableCell>
+      <TableCell className="max-w-0">
+        <span className="block truncate font-mono text-[12.5px] text-muted-foreground">
+          <VariableText
+            text={call.url || "—"}
+            variant="chip"
+            values={variableValues}
+          />
+        </span>
+      </TableCell>
+      <TableCell className={COL.spark}>
+        {call.recentRuns && call.recentRuns.length > 0 ? (
+          <LatencySparkline runs={call.recentRuns} />
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell className={COL.status}>
+        <Badge variant={status.variant}>{status.label}</Badge>
+      </TableCell>
+      <TableCell className={COL.actions}>
+        {!overlay ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="size-7"
+                aria-label={`Open menu for ${call.name}`}
+              >
+                <EllipsisIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuGroup>
+                <DropdownMenuItem onSelect={() => onOpen?.()}>
+                  <PencilIcon />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => onDuplicate?.()}>
+                  <CopyIcon />
+                  Duplicate
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                disabled={deleting}
+                onSelect={() => onRemove?.()}
+              >
+                <Trash2Icon />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : null}
+      </TableCell>
+    </>
+  )
+}
+
+function SortableCallRow({
+  call,
+  variableValues,
+  onOpen,
+  onRemove,
+  onDuplicate,
+  deleting,
+}: {
+  call: Call
+  variableValues?: Record<string, string>
+  onOpen: () => void
+  onRemove: () => void
+  onDuplicate: () => void
   deleting?: boolean
 }) {
   const {
@@ -305,133 +446,59 @@ function CallCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({
-    id: call.id,
-    disabled: !!overlay,
-  })
+  } = useSortable({ id: call.id })
 
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={cn(isDragging && "opacity-40")}
+      data-state={isDragging ? "selected" : undefined}
+    >
+      <CallCells
+        call={call}
+        variableValues={variableValues}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        onOpen={onOpen}
+        onRemove={onRemove}
+        onDuplicate={onDuplicate}
+        deleting={deleting}
+      />
+    </TableRow>
+  )
+}
+
+function CallRowOverlay({
+  call,
+  variableValues,
+  width,
+}: {
+  call: Call
+  variableValues?: Record<string, string>
+  width: number
+}) {
   useEffect(() => {
-    if (!overlay) return
     document.body.style.cursor = "grabbing"
     return () => {
       document.body.style.cursor = ""
     }
-  }, [overlay])
-
-  const method = (call.method ?? "GET").toUpperCase()
-  const pill = statusPill(call.lastStatus)
+  }, [])
 
   return (
-    <div
-      ref={overlay ? undefined : setNodeRef}
-      style={
-        overlay
-          ? undefined
-          : {
-              transform: CSS.Transform.toString(transform),
-              transition,
-            }
-      }
-      className={cn(
-        "flex",
-        overlay && "scale-[1.01]",
-        isDragging && !overlay && "opacity-50"
-      )}
+    <TableRoot
+      className="table-fixed border-collapse bg-background shadow-lg ring-1 ring-foreground/10"
+      style={{ width: width || undefined }}
     >
-      <div
-        className={cn(
-          "group min-w-0 flex-1 overflow-hidden bg-white",
-          overlay && "rounded-[14px] border border-border shadow-lg"
-        )}
-      >
-        <div className="flex flex-nowrap items-center gap-2 px-2 py-2">
-          {!overlay && (
-            <button
-              type="button"
-              {...attributes}
-              {...listeners}
-              aria-label={`Reorder ${call.name}`}
-              className="flex size-8 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground/50 transition-colors hover:bg-muted hover:text-muted-foreground active:cursor-grabbing"
-            >
-              <GripVerticalIcon className="size-4" />
-            </button>
-          )}
-          <span
-            title={method}
-            className={cn(
-              "flex h-7 w-14 shrink-0 items-center justify-center rounded-md font-mono text-xs font-semibold",
-              methodClass(call.method)
-            )}
-          >
-            {method}
-          </span>
-
-          <div className="min-w-0 flex-1 text-left">
-            <span className="block truncate font-mono text-[12.5px] leading-5 text-muted-foreground">
-              <VariableText
-                text={call.url || "—"}
-                variant="chip"
-                values={variableValues}
-              />
-            </span>
-          </div>
-
-          <div className="flex shrink-0 flex-nowrap items-center gap-4">
-            {call.recentRuns && call.recentRuns.length > 0 && (
-              <LatencySparkline runs={call.recentRuns} />
-            )}
-
-            <div className="relative ml-auto h-8 min-w-20 shrink-0">
-              <div
-                className={cn(
-                  "absolute inset-y-0 right-0 flex items-center transition-opacity duration-200 group-focus-within:opacity-0 group-hover:opacity-0",
-                  !call.lastStatus && "invisible"
-                )}
-              >
-                <span className={cn("size-1.5 rounded-full", pill.dot)} />
-              </div>
-
-              <div className="absolute inset-y-0 right-[-10px] flex items-center gap-0.5 rounded-full border border-border bg-background p-0.5 opacity-100 transition-opacity duration-200 ease-out sm:opacity-0 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
-                <button
-                  type="button"
-                  aria-label={`Edit ${call.name}`}
-                  className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-400"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onOpen?.()
-                  }}
-                >
-                  <PencilIcon className="size-3.5" strokeWidth={1.6} />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Duplicate ${call.name}`}
-                  className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-500/10 dark:hover:text-sky-400"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onDuplicate?.()
-                  }}
-                >
-                  <CopyIcon className="size-3.5" strokeWidth={1.6} />
-                </button>
-                <button
-                  type="button"
-                  aria-label={`Delete ${call.name}`}
-                  disabled={deleting}
-                  className="grid size-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:pointer-events-none disabled:opacity-40 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onRemove?.()
-                  }}
-                >
-                  <Trash2Icon className="size-3.5" strokeWidth={1.6} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+      <CallTableColgroup />
+      <tbody>
+        <TableRow className="border-b bg-background hover:bg-background">
+          <CallCells call={call} overlay variableValues={variableValues} />
+        </TableRow>
+      </tbody>
+    </TableRoot>
   )
 }
 
@@ -439,6 +506,7 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editedId, setEditedId] = useState<string | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [tableWidth, setTableWidth] = useState(0)
   const [callToDelete, setCallToDelete] = useState<Call | null>(null)
 
   const callsQuery = useCalls(workflowId)
@@ -462,8 +530,7 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const calls = callsQuery.data ?? EMPTY_CALLS
 
   const orderedCalls = useMemo(
-    () =>
-      [...calls].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
+    () => [...calls].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     [calls]
   )
 
@@ -514,11 +581,32 @@ export function CallList({ workflowId }: { workflowId: string }) {
   const active = orderedCalls.find((call) => call.id === activeId)
 
   return (
-    <section className="flex flex-col">
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={openCreate}
+          disabled={orderedCalls.length >= 20}
+        >
+          <PlusIcon data-icon="inline-start" />
+          Add call
+        </Button>
+      </div>
+
       {callsQuery.isLoading ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : callsQuery.error ? (
         <p className="text-destructive">{callsQuery.error.message}</p>
+      ) : orderedCalls.length === 0 ? (
+        <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed p-6">
+          <p className="text-sm text-muted-foreground">No calls yet.</p>
+          <Button type="button" size="sm" onClick={openCreate}>
+            <PlusIcon data-icon="inline-start" />
+            Add call
+          </Button>
+        </div>
       ) : (
         <DndContext
           sensors={sensors}
@@ -527,15 +615,36 @@ export function CallList({ workflowId }: { workflowId: string }) {
           onDragEnd={onDragEnd}
           onDragCancel={() => setActiveId(null)}
         >
-          <SortableContext
-            items={orderedCalls.map((call) => call.id)}
-            strategy={verticalListSortingStrategy}
+          <div
+            className="overflow-hidden rounded-lg border bg-card"
+            ref={(node) => {
+              if (node) setTableWidth(node.getBoundingClientRect().width)
+            }}
           >
-            <div className="overflow-hidden rounded-xl border border-[#e6e8ef] bg-white">
-              <ol className="flex flex-col divide-y divide-[#eef0f4]">
-                {orderedCalls.map((call) => (
-                  <li key={call.id} className="list-none">
-                    <CallCard
+            <SortableContext
+              items={orderedCalls.map((call) => call.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <Table className="table-fixed">
+                <CallTableColgroup />
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className={COL.grip}>
+                      <span className="sr-only">Reorder</span>
+                    </TableHead>
+                    <TableHead className={COL.method}>Method</TableHead>
+                    <TableHead>URL</TableHead>
+                    <TableHead className={COL.spark}>Latency</TableHead>
+                    <TableHead className={COL.status}>Status</TableHead>
+                    <TableHead className={COL.actions}>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {orderedCalls.map((call) => (
+                    <SortableCallRow
+                      key={call.id}
                       call={call}
                       variableValues={variableValues}
                       onOpen={() => openEdit(call.id)}
@@ -546,17 +655,17 @@ export function CallList({ workflowId }: { workflowId: string }) {
                         deleteMutation.variables === call.id
                       }
                     />
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </SortableContext>
+                  ))}
+                </TableBody>
+              </Table>
+            </SortableContext>
+          </div>
           <DragOverlay dropAnimation={DROP_ANIMATION}>
             {active ? (
-              <CallCard
+              <CallRowOverlay
                 call={active}
                 variableValues={variableValues}
-                overlay
+                width={tableWidth}
               />
             ) : null}
           </DragOverlay>
