@@ -125,3 +125,42 @@ export function refetchAllWorkflowContext(queryClient: QueryClient) {
       query.queryKey[2] === "context",
   })
 }
+
+const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** Debounced refresh of expiry items (and optionally policies). */
+export function refetchWorkflowExpiry(
+  queryClient: QueryClient,
+  workflowId: string,
+  scope: "items" | "all" = "items"
+) {
+  const key = `${workflowId}:${scope}`
+  const existing = expiryTimers.get(key)
+  if (existing) clearTimeout(existing)
+  expiryTimers.set(
+    key,
+    setTimeout(() => {
+      expiryTimers.delete(key)
+      if (scope === "all") {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.expiry.all(workflowId),
+        })
+        return
+      }
+      void queryClient.invalidateQueries({
+        queryKey: [...queryKeys.expiry.all(workflowId), "items"],
+      })
+    }, CONTEXT_DEBOUNCE_MS)
+  )
+}
+
+export function refetchAllWorkflowExpiry(queryClient: QueryClient) {
+  for (const timer of expiryTimers.values()) clearTimeout(timer)
+  expiryTimers.clear()
+  return queryClient.invalidateQueries({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey[0] === "workflows" &&
+      query.queryKey[2] === "expiry",
+  })
+}

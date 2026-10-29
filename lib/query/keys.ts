@@ -38,6 +38,15 @@ export const queryKeys = {
       [...queryKeys.context.all(workflowId), "variables"] as const,
   },
 
+  expiry: {
+    all: (workflowId: string) =>
+      [...queryKeys.workflows.detail(workflowId), "expiry"] as const,
+    policies: (workflowId: string) =>
+      [...queryKeys.expiry.all(workflowId), "policies"] as const,
+    items: (workflowId: string, type: string) =>
+      [...queryKeys.expiry.all(workflowId), "items", type] as const,
+  },
+
   /** Separate root so exact workflow-detail invalidation does not cascade. */
   runs: {
     all: (workflowId: string) => ["runs", workflowId] as const,

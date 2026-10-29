@@ -6,9 +6,11 @@ import { useCallback, useRef } from "react"
 import {
   applyWorkflowStarted,
   refetchAllWorkflowContext,
+  refetchAllWorkflowExpiry,
   refetchStatistics,
   refetchWorkflowContext,
   refetchWorkflowDetail,
+  refetchWorkflowExpiry,
   refetchWorkflowRuns,
 } from "./stats-cache"
 import {
@@ -33,10 +35,26 @@ export function UserCentrifugeListener() {
   const handlePublication = useCallback(
     (data: unknown) => {
       if (!isUserStreamEvent(data)) return
-      if (!shouldRefreshStats(data)) return
 
       const event = data as UserStreamEvent
       console.log("[Centrifugo] refresh", event.type, event.workflowId)
+
+      if (eventTypeEquals(event, "expiry.alerted")) {
+        if (event.workflowId) {
+          refetchWorkflowExpiry(queryClient, event.workflowId, "items")
+        }
+        return
+      }
+
+      if (eventTypeEquals(event, "workflow.updated")) {
+        if (event.workflowId) {
+          refetchWorkflowExpiry(queryClient, event.workflowId, "all")
+          void refetchWorkflowDetail(queryClient, event.workflowId)
+        }
+        return
+      }
+
+      if (!shouldRefreshStats(event)) return
 
       if (eventTypeEquals(event, "workflow.started")) {
         applyWorkflowStarted(queryClient, event.workflowId)
@@ -53,13 +71,14 @@ export function UserCentrifugeListener() {
         return
       }
 
-      // workflow.finished — stats + workflow detail + runs list + context column.
+      // workflow.finished — stats + runs + context + expiry items.
       if (startedTimeoutRef.current) clearTimeout(startedTimeoutRef.current)
       void refetchStatistics(queryClient)
       if (event.workflowId) {
         void refetchWorkflowDetail(queryClient, event.workflowId)
         void refetchWorkflowRuns(queryClient, event.workflowId)
         refetchWorkflowContext(queryClient, event.workflowId)
+        refetchWorkflowExpiry(queryClient, event.workflowId, "items")
       }
     },
     [queryClient]
@@ -68,6 +87,7 @@ export function UserCentrifugeListener() {
   const onReconnected = useCallback(() => {
     void refetchStatistics(queryClient)
     void refetchAllWorkflowContext(queryClient)
+    void refetchAllWorkflowExpiry(queryClient)
     void queryClient.invalidateQueries({
       predicate: (query) =>
         query.queryKey[0] === "runs" && query.queryKey[2] === "list",

@@ -29,7 +29,8 @@ const WORKFLOW_TABS = ["overview", "runs"] as const
 type WorkflowTab = (typeof WORKFLOW_TABS)[number]
 
 function parseWorkflowTab(value: string | null): WorkflowTab {
-  return value === "runs" ? "runs" : "overview"
+  if (value === "runs") return value
+  return "overview"
 }
 
 function formatRunError(error: Error) {

@@ -11,6 +11,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
+import { WorkflowSettings } from "@/components/workflow/workflow-settings"
 import {
   useCreateWorkflow,
   useDeleteWorkflow,
@@ -74,7 +75,7 @@ export function WorkflowDrawer({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>{isEdit ? "Edit workflow" : "New workflow"}</SheetTitle>
         </SheetHeader>
@@ -84,18 +85,25 @@ export function WorkflowDrawer({
         ) : isEdit && workflowQuery.error ? (
           <p className="px-4 text-destructive">{workflowQuery.error.message}</p>
         ) : open ? (
-          <WorkflowForm
-            key={workflowQuery.data?.id ?? "new"}
-            workflow={isEdit ? workflowQuery.data : undefined}
-            isPending={mutation.isPending}
-            isDeleting={deleteMutation.isPending}
-            error={
-              mutation.error?.message ?? deleteMutation.error?.message ?? null
-            }
-            onSubmit={handleSubmit}
-            onCancel={() => handleOpenChange(false)}
-            onDelete={isEdit ? handleDelete : undefined}
-          />
+          <div className="flex flex-col gap-6 pb-6">
+            <WorkflowForm
+              key={workflowQuery.data?.id ?? "new"}
+              workflow={isEdit ? workflowQuery.data : undefined}
+              isPending={mutation.isPending}
+              isDeleting={deleteMutation.isPending}
+              error={
+                mutation.error?.message ?? deleteMutation.error?.message ?? null
+              }
+              onSubmit={handleSubmit}
+              onCancel={() => handleOpenChange(false)}
+              onDelete={isEdit ? handleDelete : undefined}
+            />
+            {workflowId ? (
+              <div className="border-t px-4 pt-4">
+                <WorkflowSettings workflowId={workflowId} />
+              </div>
+            ) : null}
+          </div>
         ) : null}
       </SheetContent>
     </Sheet>

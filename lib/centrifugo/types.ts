@@ -1,4 +1,8 @@
-export type RealtimeEventType = "workflow.started" | "workflow.finished"
+export type RealtimeEventType =
+  | "workflow.started"
+  | "workflow.finished"
+  | "workflow.updated"
+  | "expiry.alerted"
 
 export interface UserStreamEvent {
   type: string
@@ -8,7 +12,12 @@ export interface UserStreamEvent {
   runId?: string
 }
 
-const EVENT_TYPES = new Set<string>(["workflow.started", "workflow.finished"])
+const EVENT_TYPES = new Set<string>([
+  "workflow.started",
+  "workflow.finished",
+  "workflow.updated",
+  "expiry.alerted",
+])
 
 /** Strips optional schema version suffix (`workflow.started.v1` → `workflow.started`). */
 export function canonicalizeRealtimeType(type: string): string {
