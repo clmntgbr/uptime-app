@@ -41,7 +41,7 @@ export default function Page() {
   }
 
   return (
-    <div className="flex flex-col gap-4 py-4">
+    <div className="container mx-auto flex max-w-8xl flex-col gap-4 py-4">
       <DashboardStats />
 
       <div className="flex items-center justify-between">
