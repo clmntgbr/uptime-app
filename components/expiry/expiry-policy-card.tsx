@@ -57,8 +57,6 @@ function serverSnapshot(
   })
 }
 
-const DEFAULT_THRESHOLDS = [30, 14, 7, 1]
-
 export function ExpiryPolicyCard({
   workflowId,
   type,
@@ -80,14 +78,14 @@ export function ExpiryPolicyCard({
         (policy) => policy.type === type
       ) ?? {
         type,
-        enabled: true,
-        thresholdsDays: DEFAULT_THRESHOLDS,
+        enabled: false,
+        thresholdsDays: [],
       }
     )
   }, [policiesQuery.data, type])
 
-  const [enabled, setEnabled] = useState(true)
-  const [thresholds, setThresholds] = useState<number[]>(DEFAULT_THRESHOLDS)
+  const [enabled, setEnabled] = useState(false)
+  const [thresholds, setThresholds] = useState<number[]>([])
   const [draft, setDraft] = useState("")
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [flashDay, setFlashDay] = useState<number | null>(null)

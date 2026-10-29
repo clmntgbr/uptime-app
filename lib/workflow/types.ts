@@ -25,12 +25,20 @@ export interface Workflow {
   lastStatus?: string
 }
 
+export interface WorkflowExpiryPolicyInput {
+  type: "tls_certificate"
+  enabled: boolean
+  thresholdsDays: number[]
+}
+
 export interface WorkflowInput {
   name: string
   scheduleType: WorkflowScheduleType
   intervalSeconds?: number
   runAt?: string
   enabled: boolean
+  /** Create only — ignored on update. */
+  expiryPolicies?: WorkflowExpiryPolicyInput[]
 }
 
 export interface WorkflowIdResponse {

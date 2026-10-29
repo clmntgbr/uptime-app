@@ -15,10 +15,11 @@ import {
 } from "./api"
 import type { Call, CallInput } from "./types"
 
-export function useCalls(workflowId: string) {
+export function useCalls(workflowId: string | null | undefined) {
   return useQuery({
-    queryKey: queryKeys.calls.list(workflowId),
-    queryFn: () => listCalls(workflowId),
+    queryKey: queryKeys.calls.list(workflowId ?? ""),
+    queryFn: () => listCalls(workflowId as string),
+    enabled: !!workflowId,
   })
 }
 

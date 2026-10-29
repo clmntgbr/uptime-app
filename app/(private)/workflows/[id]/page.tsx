@@ -8,6 +8,7 @@ import { WorkflowCharts } from "@/components/workflow/workflow-charts"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { WorkflowStats } from "@/components/workflow/workflow-stats"
 import { ApiError } from "@/lib/api-error"
+import { useCalls } from "@/lib/call/hooks"
 import {
   useRunWorkflow,
   useStopWorkflow,
@@ -37,6 +38,17 @@ function formatRunError(error: Error) {
   if (!(error instanceof ApiError)) return error.message
   if (error.code === "RUN_IN_PROGRESS") return "A run is already in progress."
   if (error.code === "NO_RUN_IN_PROGRESS") return "No run is in progress."
+  if (error.code === "NO_CALLS") {
+    return "Add at least one call before running this workflow."
+  }
+  return error.message
+}
+
+function formatUpdateError(error: Error) {
+  if (!(error instanceof ApiError)) return error.message
+  if (error.code === "NO_CALLS") {
+    return "Add at least one call before enabling this workflow."
+  }
   return error.message
 }
 
@@ -82,6 +94,7 @@ export default function WorkflowPage() {
   )
 
   const workflowQuery = useWorkflow(id)
+  const callsQuery = useCalls(id)
   const runMutation = useRunWorkflow()
   const stopMutation = useStopWorkflow()
   const updateMutation = useUpdateWorkflow()
@@ -109,6 +122,8 @@ export default function WorkflowPage() {
 
   const workflow = workflowQuery.data
   const isRunning = workflow.isRunning
+  const hasCalls = (callsQuery.data?.length ?? 0) > 0
+  const canEnable = hasCalls || workflow.enabled
 
   return (
     <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-0">
@@ -148,7 +163,12 @@ export default function WorkflowPage() {
               id="workflow-enabled-header"
               size="sm"
               checked={workflow.enabled}
-              disabled={updateMutation.isPending}
+              disabled={updateMutation.isPending || !canEnable}
+              title={
+                canEnable
+                  ? undefined
+                  : "Add at least one call before enabling"
+              }
               onCheckedChange={(enabled) =>
                 updateMutation.mutate({
                   id: workflow.id,
@@ -173,7 +193,10 @@ export default function WorkflowPage() {
               <Button
                 type="button"
                 size="sm"
-                disabled={runMutation.isPending}
+                disabled={runMutation.isPending || !hasCalls}
+                title={
+                  hasCalls ? undefined : "Add at least one call before running"
+                }
                 onClick={() => runMutation.mutate(workflow.id)}
               >
                 {runMutation.isPending ? "Starting…" : "Run"}
@@ -198,7 +221,9 @@ export default function WorkflowPage() {
           </p>
         )}
         {updateMutation.error && (
-          <p className="text-destructive">{updateMutation.error.message}</p>
+          <p className="text-destructive">
+            {formatUpdateError(updateMutation.error)}
+          </p>
         )}
 
         <WorkflowStats
