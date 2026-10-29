@@ -92,3 +92,36 @@ export function refetchWorkflowRuns(
     queryKey: queryKeys.runs.lists(workflowId),
   })
 }
+
+const CONTEXT_DEBOUNCE_MS = 500
+const contextTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** Debounced refresh of the workflow context column (latest run + variables). */
+export function refetchWorkflowContext(
+  queryClient: QueryClient,
+  workflowId: string
+) {
+  const existing = contextTimers.get(workflowId)
+  if (existing) clearTimeout(existing)
+  contextTimers.set(
+    workflowId,
+    setTimeout(() => {
+      contextTimers.delete(workflowId)
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.context.all(workflowId),
+      })
+    }, CONTEXT_DEBOUNCE_MS)
+  )
+}
+
+/** Immediate context refresh for every open workflow (e.g. reconnect). */
+export function refetchAllWorkflowContext(queryClient: QueryClient) {
+  for (const timer of contextTimers.values()) clearTimeout(timer)
+  contextTimers.clear()
+  return queryClient.invalidateQueries({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey[0] === "workflows" &&
+      query.queryKey[2] === "context",
+  })
+}

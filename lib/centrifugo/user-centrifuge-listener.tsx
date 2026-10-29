@@ -5,7 +5,9 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useRef } from "react"
 import {
   applyWorkflowStarted,
+  refetchAllWorkflowContext,
   refetchStatistics,
+  refetchWorkflowContext,
   refetchWorkflowDetail,
   refetchWorkflowRuns,
 } from "./stats-cache"
@@ -51,12 +53,13 @@ export function UserCentrifugeListener() {
         return
       }
 
-      // workflow.finished — stats + workflow detail + runs list.
+      // workflow.finished — stats + workflow detail + runs list + context column.
       if (startedTimeoutRef.current) clearTimeout(startedTimeoutRef.current)
       void refetchStatistics(queryClient)
       if (event.workflowId) {
         void refetchWorkflowDetail(queryClient, event.workflowId)
         void refetchWorkflowRuns(queryClient, event.workflowId)
+        refetchWorkflowContext(queryClient, event.workflowId)
       }
     },
     [queryClient]
@@ -64,6 +67,7 @@ export function UserCentrifugeListener() {
 
   const onReconnected = useCallback(() => {
     void refetchStatistics(queryClient)
+    void refetchAllWorkflowContext(queryClient)
     void queryClient.invalidateQueries({
       predicate: (query) =>
         query.queryKey[0] === "runs" && query.queryKey[2] === "list",

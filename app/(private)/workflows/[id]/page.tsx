@@ -6,6 +6,7 @@ import { DashboardStats } from "@/components/stats/dashboard-stats"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { WorkflowContextColumn } from "@/components/workflow/context-column"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { ApiError } from "@/lib/api-error"
 import {
@@ -206,7 +207,12 @@ export default function WorkflowPage() {
           lastStatus={workflow.lastStatus}
           isRunning={workflow.isRunning}
         />
-        <CallList workflowId={workflow.id} />
+        <div className="flex flex-col gap-4 min-[900px]:flex-row min-[900px]:items-start">
+          <div className="min-w-0 flex-1">
+            <CallList workflowId={workflow.id} />
+          </div>
+          <WorkflowContextColumn workflowId={workflow.id} />
+        </div>
       </TabsContent>
 
       <TabsContent value="runs" className="pt-4 text-sm">

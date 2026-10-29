@@ -29,6 +29,15 @@ export const queryKeys = {
       [...queryKeys.calls.all(workflowId), callId] as const,
   },
 
+  context: {
+    all: (workflowId: string) =>
+      [...queryKeys.workflows.detail(workflowId), "context"] as const,
+    latestRun: (workflowId: string) =>
+      [...queryKeys.context.all(workflowId), "latest-run"] as const,
+    variables: (workflowId: string) =>
+      [...queryKeys.context.all(workflowId), "variables"] as const,
+  },
+
   /** Separate root so exact workflow-detail invalidation does not cascade. */
   runs: {
     all: (workflowId: string) => ["runs", workflowId] as const,
