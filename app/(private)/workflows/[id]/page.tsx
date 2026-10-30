@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WorkflowCharts } from "@/components/workflow/workflow-charts"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { WorkflowStats } from "@/components/workflow/workflow-stats"
+import { WorkflowVariablesDrawer } from "@/components/workflow/workflow-variables-drawer"
 import { ApiError } from "@/lib/api-error"
 import { useCalls } from "@/lib/call/hooks"
 import {
@@ -16,7 +17,7 @@ import {
   useWorkflow,
 } from "@/lib/workflow/hooks"
 import type { Workflow } from "@/lib/workflow/types"
-import { ArrowLeftIcon, SettingsIcon } from "lucide-react"
+import { ArrowLeftIcon, BracesIcon, SettingsIcon } from "lucide-react"
 import Link from "next/link"
 import {
   useParams,
@@ -81,6 +82,7 @@ export default function WorkflowPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [variablesOpen, setVariablesOpen] = useState(false)
   const tab = parseWorkflowTab(searchParams.get("tabs"))
 
   const setTab = useCallback(
@@ -147,6 +149,16 @@ export default function WorkflowPage() {
               onClick={() => setDrawerOpen(true)}
             >
               <SettingsIcon className="size-4" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0"
+              aria-label="Workflow variables"
+              onClick={() => setVariablesOpen(true)}
+            >
+              <BracesIcon className="size-4" />
             </Button>
           </div>
 
@@ -242,6 +254,11 @@ export default function WorkflowPage() {
       <WorkflowDrawer
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
+        workflowId={workflow.id}
+      />
+      <WorkflowVariablesDrawer
+        open={variablesOpen}
+        onOpenChange={setVariablesOpen}
         workflowId={workflow.id}
       />
     </Tabs>
