@@ -12,14 +12,12 @@ function detailLabel(variable: AvailableVariable) {
 export function AvailableVariableRow({
   variable,
   className,
-  as: Comp = "li",
 }: {
   variable: AvailableVariable
   className?: string
-  as?: "li" | "div"
 }) {
   return (
-    <Comp className={cn("flex min-w-0 items-center gap-2 px-3 py-2", className)}>
+    <div className={cn("flex min-w-0 items-center gap-2 px-3 py-2", className)}>
       <button
         type="button"
         className={cn("min-w-0 truncate text-start", VARIABLE_TEXT_CLASS)}
@@ -30,6 +28,6 @@ export function AvailableVariableRow({
       <span className="ms-auto min-w-0 truncate text-end text-xs text-muted-foreground">
         {detailLabel(variable)}
       </span>
-    </Comp>
+    </div>
   )
 }

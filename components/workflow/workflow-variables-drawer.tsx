@@ -32,9 +32,7 @@ function VariableGroup({ group }: { group: WorkflowVariableGroup }) {
       <ul className="divide-y rounded-md border bg-card">
         {group.variables.map((variable) => (
           <AvailableVariableRow
-            key={`${variable.type}-${variable.name}-${
-              variable.type === "call" ? variable.callId : ""
-            }`}
+            key={`${variable.name}-${variable.type}`}
             variable={variable}
           />
         ))}
