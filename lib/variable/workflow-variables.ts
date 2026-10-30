@@ -23,12 +23,13 @@ export function groupWorkflowVariables(
       statics.push(variable)
       continue
     }
-    const existing = byCall.get(variable.callId)
+    const callId = variable.callId || variable.callName || variable.name
+    const existing = byCall.get(callId)
     if (existing) {
       existing.variables.push(variable)
     } else {
-      byCall.set(variable.callId, {
-        callName: variable.callName,
+      byCall.set(callId, {
+        callName: variable.callName || "Call",
         variables: [variable],
       })
     }

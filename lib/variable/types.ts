@@ -4,7 +4,6 @@ export interface GlobalVariable {
   id: string
   name: string
   type: "global"
-  /** Masked (`••••`) when `secret` is true. */
   value: string
   secret?: boolean
 }
@@ -23,7 +22,6 @@ export interface GlobalVariableUpdateInput {
 export interface StaticVariable {
   name: string
   type: "static"
-  /** Masked (`••••`) when `secret` is true. */
   value: string
   secret?: boolean
 }
@@ -89,7 +87,16 @@ export function toCallVariableBody(
   return body
 }
 
-export type AvailableVariable =
-  | Omit<GlobalVariable, "id">
-  | StaticVariable
-  | (CallVariable & { callId: string; callName: string })
+export type AvailableVariableType = "global" | "static" | "call"
+
+/** Mirrors backend `Available` — flat shape for all scopes. */
+export interface AvailableVariable {
+  name: string
+  type: AvailableVariableType
+  path: string
+  source: string
+  callId: string
+  callName: string
+  secret: boolean
+  value: string
+}

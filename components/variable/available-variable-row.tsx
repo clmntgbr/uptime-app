@@ -1,15 +1,12 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
 import { VARIABLE_TEXT_CLASS } from "@/components/variable/variable-text"
 import type { AvailableVariable } from "@/lib/variable/types"
 import { cn } from "@/lib/utils"
-import { toast } from "sonner"
 
 function detailLabel(variable: AvailableVariable) {
   if (variable.secret) return "••••••"
-  if (variable.type === "call") return variable.path || "—"
-  return variable.value || "—"
+  return variable.value || variable.path || "—"
 }
 
 export function AvailableVariableRow({

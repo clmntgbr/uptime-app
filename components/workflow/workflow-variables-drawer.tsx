@@ -81,17 +81,35 @@ function useWorkflowAvailableVariables(workflowId: string, enabled: boolean) {
       ...(globalsQuery.data ?? []).map((variable) => ({
         name: variable.name,
         type: "global" as const,
+        path: "",
+        source: "",
+        callId: "",
+        callName: "",
+        secret: variable.secret ?? false,
         value: variable.value,
-        secret: variable.secret,
       })),
-      ...(staticsQuery.data ?? []),
+      ...(staticsQuery.data ?? []).map((variable) => ({
+        name: variable.name,
+        type: "static" as const,
+        path: "",
+        source: "",
+        callId: "",
+        callName: "",
+        secret: variable.secret ?? false,
+        value: variable.value,
+      })),
     ]
     calls.forEach((call, index) => {
       for (const variable of callVariablesData[index] ?? []) {
         list.push({
-          ...variable,
+          name: variable.name,
+          type: "call",
+          path: variable.path ?? "",
+          source: variable.source,
           callId: call.id,
           callName: call.name,
+          secret: variable.secret ?? false,
+          value: "",
         })
       }
     })
