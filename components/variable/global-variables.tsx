@@ -119,14 +119,14 @@ export function GlobalVariables() {
   )
 }
 
-interface GlobalVariableDrawerProps {
+export interface GlobalVariableDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   /** `null` opens the drawer in create mode. */
   variableId: string | null
 }
 
-function GlobalVariableDrawer({
+export function GlobalVariableDrawer({
   open,
   onOpenChange,
   variableId,

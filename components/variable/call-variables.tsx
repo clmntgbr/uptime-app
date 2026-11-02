@@ -296,14 +296,16 @@ export function DraftCallVariables({
   )
 }
 
-interface CallVariableDrawerProps extends CallVariablesProps {
+export interface CallVariableDrawerProps {
+  workflowId: string
+  callId: string
   open: boolean
   onOpenChange: (open: boolean) => void
   /** `null` opens the drawer in create mode. */
   variableName: string | null
 }
 
-function CallVariableDrawer({
+export function CallVariableDrawer({
   workflowId,
   callId,
   open,
