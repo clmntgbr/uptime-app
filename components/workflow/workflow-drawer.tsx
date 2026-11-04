@@ -13,6 +13,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
+import { EmailRecipientsInput } from "@/components/notify-settings/email-recipients-input"
 import { WorkflowSettings } from "@/components/workflow/workflow-settings"
 import {
   EXPIRY_MAX_THRESHOLDS,
@@ -20,6 +21,7 @@ import {
   EXPIRY_TYPES,
 } from "@/lib/expiry/registry"
 import { useCalls } from "@/lib/call/hooks"
+import { useUser } from "@/lib/user/hooks"
 import {
   useCreateWorkflow,
   useDeleteWorkflow,
@@ -34,7 +36,7 @@ import {
 import { cn } from "@/lib/utils"
 import { XIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 interface WorkflowDrawerProps {
   open: boolean
@@ -87,7 +89,7 @@ export function WorkflowDrawer({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+      <SheetContent className="w-full overflow-y-auto sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>{isEdit ? "Edit workflow" : "New workflow"}</SheetTitle>
         </SheetHeader>
@@ -169,10 +171,19 @@ function WorkflowForm({
   )
   const [runAt, setRunAt] = useState(toDateTimeLocal(workflow?.runAt))
   const [enabled, setEnabled] = useState(workflow?.enabled ?? false)
+  const { user } = useUser()
   const [tlsAlertsEnabled, setTlsAlertsEnabled] = useState(false)
   const [tlsThresholds, setTlsThresholds] = useState<number[]>([])
   const [tlsDraft, setTlsDraft] = useState("")
   const [tlsFieldError, setTlsFieldError] = useState<string | null>(null)
+  const [notificationEmails, setNotificationEmails] = useState<string[]>([])
+  const [notificationEmailsTouched, setNotificationEmailsTouched] =
+    useState(false)
+
+  useEffect(() => {
+    if (!isCreate || notificationEmailsTouched || !user?.email) return
+    setNotificationEmails([user.email.toLowerCase()])
+  }, [isCreate, user?.email, notificationEmailsTouched])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -200,6 +211,7 @@ function WorkflowForm({
                   thresholdsDays: tlsThresholds,
                 },
               ],
+              notificationEmails,
             }
           : {}),
       })
@@ -316,6 +328,17 @@ function WorkflowForm({
           the workflow page.
         </p>
       )}
+
+      {isCreate ? (
+        <EmailRecipientsInput
+          label="Notification emails"
+          emails={notificationEmails}
+          onChange={(next) => {
+            setNotificationEmailsTouched(true)
+            setNotificationEmails(next)
+          }}
+        />
+      ) : null}
 
       {isCreate ? (
         <div className="flex flex-col gap-3 rounded-md border p-3">

@@ -39,6 +39,8 @@ export interface WorkflowInput {
   enabled: boolean
   /** Create only — ignored on update. */
   expiryPolicies?: WorkflowExpiryPolicyInput[]
+  /** Create only — empty array means no recipients (valid). */
+  notificationEmails?: string[]
 }
 
 export interface WorkflowIdResponse {

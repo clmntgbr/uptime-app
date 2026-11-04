@@ -55,6 +55,16 @@ export const queryKeys = {
     detail: (incidentId: string) => ["incidents", incidentId] as const,
   },
 
+  incidentPolicies: {
+    list: (workflowId: string) =>
+      [...queryKeys.workflows.detail(workflowId), "incident-policies"] as const,
+  },
+
+  notifySettings: {
+    detail: (workflowId: string) =>
+      [...queryKeys.workflows.detail(workflowId), "notification-settings"] as const,
+  },
+
   /** Separate root so exact workflow-detail invalidation does not cascade. */
   runs: {
     all: (workflowId: string) => ["runs", workflowId] as const,
