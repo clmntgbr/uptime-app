@@ -164,3 +164,34 @@ export function refetchAllWorkflowExpiry(queryClient: QueryClient) {
       query.queryKey[2] === "expiry",
   })
 }
+
+const incidentTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** Debounced refresh of active incidents for a workflow. */
+export function refetchWorkflowIncidents(
+  queryClient: QueryClient,
+  workflowId: string
+) {
+  const existing = incidentTimers.get(workflowId)
+  if (existing) clearTimeout(existing)
+  incidentTimers.set(
+    workflowId,
+    setTimeout(() => {
+      incidentTimers.delete(workflowId)
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.incidents.all(workflowId),
+      })
+    }, CONTEXT_DEBOUNCE_MS)
+  )
+}
+
+export function refetchAllWorkflowIncidents(queryClient: QueryClient) {
+  for (const timer of incidentTimers.values()) clearTimeout(timer)
+  incidentTimers.clear()
+  return queryClient.invalidateQueries({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey[0] === "workflows" &&
+      query.queryKey[2] === "incidents",
+  })
+}

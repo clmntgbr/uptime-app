@@ -7,10 +7,12 @@ import {
   applyWorkflowStarted,
   refetchAllWorkflowContext,
   refetchAllWorkflowExpiry,
+  refetchAllWorkflowIncidents,
   refetchStatistics,
   refetchWorkflowContext,
   refetchWorkflowDetail,
   refetchWorkflowExpiry,
+  refetchWorkflowIncidents,
   refetchWorkflowRuns,
 } from "./stats-cache"
 import {
@@ -42,6 +44,18 @@ export function UserCentrifugeListener() {
       if (eventTypeEquals(event, "expiry.alerted")) {
         if (event.workflowId) {
           refetchWorkflowExpiry(queryClient, event.workflowId, "items")
+        }
+        return
+      }
+
+      if (
+        eventTypeEquals(event, "incident.opened") ||
+        eventTypeEquals(event, "incident.acknowledged") ||
+        eventTypeEquals(event, "incident.resolved") ||
+        eventTypeEquals(event, "incident.reopened")
+      ) {
+        if (event.workflowId) {
+          refetchWorkflowIncidents(queryClient, event.workflowId)
         }
         return
       }
@@ -88,6 +102,7 @@ export function UserCentrifugeListener() {
     void refetchStatistics(queryClient)
     void refetchAllWorkflowContext(queryClient)
     void refetchAllWorkflowExpiry(queryClient)
+    void refetchAllWorkflowIncidents(queryClient)
     void queryClient.invalidateQueries({
       predicate: (query) =>
         query.queryKey[0] === "runs" && query.queryKey[2] === "list",

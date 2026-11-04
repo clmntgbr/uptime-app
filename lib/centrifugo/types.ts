@@ -3,6 +3,10 @@ export type RealtimeEventType =
   | "workflow.finished"
   | "workflow.updated"
   | "expiry.alerted"
+  | "incident.opened"
+  | "incident.acknowledged"
+  | "incident.resolved"
+  | "incident.reopened"
 
 export interface UserStreamEvent {
   type: string
@@ -10,6 +14,7 @@ export interface UserStreamEvent {
   userId?: string
   workflowId?: string
   runId?: string
+  incidentId?: string
 }
 
 const EVENT_TYPES = new Set<string>([
@@ -17,6 +22,10 @@ const EVENT_TYPES = new Set<string>([
   "workflow.finished",
   "workflow.updated",
   "expiry.alerted",
+  "incident.opened",
+  "incident.acknowledged",
+  "incident.resolved",
+  "incident.reopened",
 ])
 
 /** Strips optional schema version suffix (`workflow.started.v1` → `workflow.started`). */

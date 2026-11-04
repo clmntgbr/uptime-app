@@ -1,5 +1,6 @@
 "use client"
 
+import { WorkflowIncidentsCard } from "@/components/incident/workflow-incidents-card"
 import { RunList } from "@/components/run/run-list"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
@@ -245,6 +246,7 @@ export default function WorkflowPage() {
           isRunning={workflow.isRunning}
         />
         <WorkflowCharts workflowId={workflow.id} />
+        <WorkflowIncidentsCard workflowId={workflow.id} />
       </TabsContent>
 
       <TabsContent value="runs" className="pt-4 text-sm">

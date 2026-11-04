@@ -47,6 +47,13 @@ export const queryKeys = {
       [...queryKeys.expiry.all(workflowId), "items", type] as const,
   },
 
+  incidents: {
+    all: (workflowId: string) =>
+      [...queryKeys.workflows.detail(workflowId), "incidents"] as const,
+    active: (workflowId: string) =>
+      [...queryKeys.incidents.all(workflowId), "active"] as const,
+  },
+
   /** Separate root so exact workflow-detail invalidation does not cascade. */
   runs: {
     all: (workflowId: string) => ["runs", workflowId] as const,
