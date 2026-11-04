@@ -30,6 +30,39 @@ export interface IncidentListResponse {
   total: number
 }
 
+export type IncidentEventType =
+  | "opened"
+  | "failing"
+  | "acknowledged"
+  | "resolved"
+  | "reopened"
+  | "reminder"
+  | string
+
+export interface IncidentEvent {
+  at: string
+  type: IncidentEventType
+  runId?: string
+  payload: Record<string, unknown>
+}
+
+export interface IncidentDetail {
+  id: string
+  workflowId: string
+  kind: IncidentKind | string
+  callId?: string
+  fingerprint: string
+  severity: IncidentSeverity | string
+  state: IncidentState | string
+  cause: Record<string, unknown>
+  openedAt: string
+  acknowledgedAt?: string
+  acknowledgedBy?: string
+  resolvedAt?: string
+  reopenCount: number
+  events: IncidentEvent[]
+}
+
 export const INCIDENT_KIND_LABELS: Record<string, string> = {
   call_failed: "Call failed",
   workflow_failed: "Workflow failed",
@@ -42,4 +75,36 @@ export const INCIDENT_KIND_LABELS: Record<string, string> = {
 
 export function incidentKindLabel(kind: string): string {
   return INCIDENT_KIND_LABELS[kind] ?? kind
+}
+
+export function incidentStateLabel(state: string): string {
+  switch (state) {
+    case "open":
+      return "Open"
+    case "acknowledged":
+      return "Acknowledged"
+    case "resolved":
+      return "Resolved"
+    default:
+      return state
+  }
+}
+
+export function incidentEventLabel(type: string): string {
+  switch (type) {
+    case "opened":
+      return "Opened"
+    case "failing":
+      return "Still failing"
+    case "acknowledged":
+      return "Acknowledged"
+    case "resolved":
+      return "Resolved"
+    case "reopened":
+      return "Reopened"
+    case "reminder":
+      return "Reminder sent"
+    default:
+      return type
+  }
 }

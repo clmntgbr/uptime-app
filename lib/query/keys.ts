@@ -52,6 +52,7 @@ export const queryKeys = {
       [...queryKeys.workflows.detail(workflowId), "incidents"] as const,
     active: (workflowId: string) =>
       [...queryKeys.incidents.all(workflowId), "active"] as const,
+    detail: (incidentId: string) => ["incidents", incidentId] as const,
   },
 
   /** Separate root so exact workflow-detail invalidation does not cascade. */
