@@ -136,6 +136,7 @@ export function CallVariables({ workflowId, callId }: CallVariablesProps) {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         variableName={editedName}
+        nested
       />
     </section>
   )
@@ -254,7 +255,7 @@ export function DraftCallVariables({
       </Button>
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+        <SheetContent nested className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader>
             <SheetTitle>
               {editedIndex === null ? "Add variable" : "Edit call variable"}
@@ -303,6 +304,8 @@ export interface CallVariableDrawerProps {
   onOpenChange: (open: boolean) => void
   /** `null` opens the drawer in create mode. */
   variableName: string | null
+  /** Stack above an already-open sheet (higher z-index). */
+  nested?: boolean
 }
 
 export function CallVariableDrawer({
@@ -311,6 +314,7 @@ export function CallVariableDrawer({
   open,
   onOpenChange,
   variableName,
+  nested = false,
 }: CallVariableDrawerProps) {
   const isEdit = variableName !== null
   const variableQuery = useCallVariable(
@@ -366,7 +370,10 @@ export function CallVariableDrawer({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+      <SheetContent
+        nested={nested}
+        className="w-full overflow-y-auto sm:max-w-md"
+      >
         <SheetHeader>
           <SheetTitle>{isEdit ? "Edit variable" : "Add variable"}</SheetTitle>
         </SheetHeader>

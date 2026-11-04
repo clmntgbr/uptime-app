@@ -33,12 +33,15 @@ export function StaticVariableDrawer({
   open,
   onOpenChange,
   variableName,
+  nested = false,
 }: {
   workflowId: string
   open: boolean
   onOpenChange: (open: boolean) => void
   /** `null` opens the drawer in create mode. */
   variableName: string | null
+  /** Stack above an already-open sheet (higher z-index). */
+  nested?: boolean
 }) {
   const isEdit = variableName !== null
   const variableQuery = useStaticVariable(
@@ -80,7 +83,10 @@ export function StaticVariableDrawer({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+      <SheetContent
+        nested={nested}
+        className="w-full overflow-y-auto sm:max-w-md"
+      >
         <SheetHeader>
           <SheetTitle>
             {isEdit ? "Edit static variable" : "New static variable"}

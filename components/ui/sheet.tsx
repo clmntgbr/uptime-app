@@ -45,24 +45,31 @@ function SheetOverlay({
   )
 }
 
+/** Exit animation duration — keep stacked sheet targets mounted at least this long. */
+export const SHEET_CLOSE_MS = 200
+
 function SheetContent({
   className,
   children,
   side = "right",
   showCloseButton = true,
+  nested = false,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
+  /** Stack above an already-open sheet (higher z-index, used with `modal={false}`). */
+  nested?: boolean
 }) {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay className={nested ? "z-[60]" : undefined} />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         data-side={side}
         className={cn(
           "fixed z-50 flex flex-col bg-popover bg-clip-padding text-xs/relaxed text-popover-foreground shadow-lg transition duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-closed:duration-200 data-[side=bottom]:inset-x-0 data-[side=bottom]:bottom-0 data-[side=bottom]:h-auto data-[side=bottom]:border-t data-[side=left]:inset-y-0 data-[side=left]:left-0 data-[side=left]:h-full data-[side=left]:w-3/4 data-[side=left]:border-e data-[side=right]:inset-y-0 data-[side=right]:right-0 data-[side=right]:h-full data-[side=right]:w-3/4 data-[side=right]:border-s data-[side=top]:inset-x-0 data-[side=top]:top-0 data-[side=top]:h-auto data-[side=top]:border-b data-[side=right]:rounded-s-lg data-[side=left]:rounded-e-lg data-[side=top]:rounded-b-lg data-[side=bottom]:rounded-t-lg data-[side=left]:sm:max-w-sm data-[side=right]:sm:max-w-sm data-open:animate-in data-[side=bottom]:data-open:slide-in-from-bottom data-[side=left]:data-open:slide-in-from-left data-[side=right]:data-open:slide-in-from-right data-[side=top]:data-open:slide-in-from-top data-closed:animate-out data-[side=bottom]:data-closed:slide-out-to-bottom data-[side=left]:data-closed:slide-out-to-left data-[side=right]:data-closed:slide-out-to-right data-[side=top]:data-closed:slide-out-to-top",
+          nested && "z-[60]",
           className
         )}
         {...props}

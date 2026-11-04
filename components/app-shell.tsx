@@ -60,7 +60,7 @@ export function AppShell({
             orientation="vertical"
             className="me-2 data-vertical:h-6 data-vertical:self-auto"
           />
-          <div className="ms-auto flex h-full items-center gap-1">
+          <div className="ms-auto flex h-full items-center gap-4">
             <ThemeToggle />
             <HeaderUserButton />
           </div>

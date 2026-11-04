@@ -124,12 +124,15 @@ export interface GlobalVariableDrawerProps {
   onOpenChange: (open: boolean) => void
   /** `null` opens the drawer in create mode. */
   variableId: string | null
+  /** Stack above an already-open sheet (higher z-index). */
+  nested?: boolean
 }
 
 export function GlobalVariableDrawer({
   open,
   onOpenChange,
   variableId,
+  nested = false,
 }: GlobalVariableDrawerProps) {
   const isEdit = variableId !== null
   const variableQuery = useGlobalVariable(open ? variableId : null)
@@ -169,7 +172,10 @@ export function GlobalVariableDrawer({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+      <SheetContent
+        nested={nested}
+        className="w-full overflow-y-auto sm:max-w-md"
+      >
         <SheetHeader>
           <SheetTitle>
             {isEdit ? "Edit global variable" : "New global variable"}

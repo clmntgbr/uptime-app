@@ -56,14 +56,14 @@ function StatCard({
   description,
   value,
   badge = null,
-  badgeVariant = "outline",
+  badgeClassName,
   footerTitle = null,
   footerHint = null,
 }: {
   description: ReactNode
   value: ReactNode
   badge?: string | null
-  badgeVariant?: "outline" | "destructive" | "secondary" | "default"
+  badgeClassName?: string
   footerTitle?: string | null
   footerHint?: string | null
 }) {
@@ -78,7 +78,9 @@ function StatCard({
         </CardTitle>
         {badge != null && (
           <CardAction>
-            <Badge variant={badgeVariant}>{badge}</Badge>
+            <Badge variant="outline" className={badgeClassName}>
+              {badge}
+            </Badge>
           </CardAction>
         )}
       </CardHeader>
@@ -96,12 +98,22 @@ function StatCard({
   )
 }
 
-function lastRunBadgeVariant(
-  status: string | undefined
-): "outline" | "destructive" | "secondary" | "default" {
-  if (status === "failed" || status === "error") return "destructive"
-  if (status === "success") return "secondary"
-  return "outline"
+/** Soft status tint — muted fills, never flashy solids. */
+function lastRunBadgeClass(status: string | undefined) {
+  switch (status) {
+    case "success":
+      return "border-transparent bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+    case "failed":
+      return "border-transparent bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
+    case "error":
+      return "border-transparent bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300"
+    case "running":
+      return "border-transparent bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300"
+    case "skipped":
+      return "border-transparent bg-muted text-muted-foreground"
+    default:
+      return undefined
+  }
 }
 
 function countWithFailures(
@@ -152,7 +164,7 @@ function LastRunStatCard({
             ? formatRunStatusLabel(resolvedStatus)
             : null
       }
-      badgeVariant={lastRunBadgeVariant(resolvedStatus)}
+      badgeClassName={lastRunBadgeClass(resolvedStatus)}
     />
   )
 }

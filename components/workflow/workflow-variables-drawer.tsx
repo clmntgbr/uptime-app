@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
+  SHEET_CLOSE_MS,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -188,11 +189,20 @@ export function WorkflowVariablesDrawer({
 
   const queryClient = useQueryClient()
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [deletingKey, setDeletingKey] = useState<string | null>(null)
 
   const deleteGlobal = useDeleteGlobalVariable()
   const deleteStatic = useDeleteStaticVariable(workflowId)
+
+  const handleEditOpenChange = (next: boolean) => {
+    setEditOpen(next)
+    if (!next) {
+      // Keep the drawer mounted until the exit animation finishes.
+      window.setTimeout(() => setEditTarget(null), SHEET_CLOSE_MS + 50)
+    }
+  }
 
   const handleEdit = (variable: AvailableVariable) => {
     setDeleteError(null)
@@ -200,10 +210,12 @@ export function WorkflowVariablesDrawer({
       const id = globalsByName.get(variable.name)
       if (!id) return
       setEditTarget({ type: "global", id })
+      setEditOpen(true)
       return
     }
     if (variable.type === "static") {
       setEditTarget({ type: "static", name: variable.name })
+      setEditOpen(true)
       return
     }
     setEditTarget({
@@ -211,6 +223,7 @@ export function WorkflowVariablesDrawer({
       callId: variable.callId,
       name: variable.name,
     })
+    setEditOpen(true)
   }
 
   const handleDelete = async (variable: AvailableVariable) => {
@@ -300,30 +313,27 @@ export function WorkflowVariablesDrawer({
       </Sheet>
 
       <GlobalVariableDrawer
-        open={editTarget?.type === "global"}
-        onOpenChange={(next) => {
-          if (!next) setEditTarget(null)
-        }}
+        nested
+        open={editOpen && editTarget?.type === "global"}
+        onOpenChange={handleEditOpenChange}
         variableId={editTarget?.type === "global" ? editTarget.id : null}
       />
 
       <StaticVariableDrawer
+        nested
         workflowId={workflowId}
-        open={editTarget?.type === "static"}
-        onOpenChange={(next) => {
-          if (!next) setEditTarget(null)
-        }}
+        open={editOpen && editTarget?.type === "static"}
+        onOpenChange={handleEditOpenChange}
         variableName={editTarget?.type === "static" ? editTarget.name : null}
       />
 
       {editTarget?.type === "call" ? (
         <CallVariableDrawer
+          nested
           workflowId={workflowId}
           callId={editTarget.callId}
-          open
-          onOpenChange={(next) => {
-            if (!next) setEditTarget(null)
-          }}
+          open={editOpen}
+          onOpenChange={handleEditOpenChange}
           variableName={editTarget.name}
         />
       ) : null}

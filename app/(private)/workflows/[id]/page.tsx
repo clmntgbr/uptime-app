@@ -131,7 +131,7 @@ export default function WorkflowPage() {
     <Tabs value={tab} onValueChange={setTab} className="flex flex-col gap-0">
       <div className="sticky top-16 z-10 -mx-4 border-b bg-card px-4">
         <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <div className="flex min-w-0 items-center gap-1.5 justify-self-start">
+          <div className="flex min-w-0 items-center gap-2 justify-self-start">
             <Link
               href="/"
               aria-label="Back to dashboard"
@@ -142,9 +142,9 @@ export default function WorkflowPage() {
             <h1 className="truncate text-sm font-medium">{workflow.name}</h1>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="icon-sm"
-              className="shrink-0"
+              className="shrink-0 hover:bg-muted hover:cursor-pointer"
               aria-label="Edit workflow"
               onClick={() => setDrawerOpen(true)}
             >
@@ -152,9 +152,9 @@ export default function WorkflowPage() {
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="outline"
               size="icon-sm"
-              className="shrink-0"
+              className="shrink-0 hover:bg-muted hover:cursor-pointer"
               aria-label="Workflow variables"
               onClick={() => setVariablesOpen(true)}
             >
