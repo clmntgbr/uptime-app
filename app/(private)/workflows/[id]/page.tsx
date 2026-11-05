@@ -248,7 +248,7 @@ export default function WorkflowPage() {
         />
         <WorkflowCharts workflowId={workflow.id} />
         <WorkflowIncidentsCard workflowId={workflow.id} />
-        <WorkflowCanvas />
+        <WorkflowCanvas workflowId={workflow.id} />
       </TabsContent>
 
       <TabsContent value="runs" className="pt-4 text-sm">

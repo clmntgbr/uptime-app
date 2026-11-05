@@ -1,57 +1,389 @@
 "use client"
 
-import {
-  Background,
-  BackgroundVariant,
-  Controls,
-  ReactFlow,
-  ReactFlowProvider,
-} from "@xyflow/react"
-import "@xyflow/react/dist/style.css"
+import { Button } from "@/components/ui/button"
+import { useCalls, useReorderCalls } from "@/lib/call/hooks"
+import type { Call } from "@/lib/call/types"
 import { cn } from "@/lib/utils"
+import {
+  closestCenter,
+  defaultDropAnimationSideEffects,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+  type DropAnimation,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import {
+  GripVerticalIcon,
+  Maximize2Icon,
+  ZoomInIcon,
+  ZoomOutIcon,
+} from "lucide-react"
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent,
+  type WheelEvent,
+} from "react"
 
-function WorkflowCanvasInner() {
-  return (
-    <ReactFlow
-      className={cn(
-        "h-full w-full bg-card",
-        "[--xy-controls-button-background-color:var(--card)]",
-        "[--xy-controls-button-background-color-hover:var(--muted)]",
-        "[--xy-controls-button-color:var(--foreground)]",
-        "[--xy-controls-button-color-hover:var(--foreground)]",
-        "[--xy-controls-button-border-color:var(--border)]",
-        "[--xy-controls-box-shadow:0_0_0_1px_var(--border)]"
-      )}
-      nodes={[]}
-      edges={[]}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable={false}
-      panOnScroll
-      zoomOnScroll
-      minZoom={0.25}
-      maxZoom={2}
-      proOptions={{ hideAttribution: true }}
-      defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-    >
-      <Background
-        variant={BackgroundVariant.Dots}
-        gap={16}
-        size={1.25}
-        color="color-mix(in oklch, var(--muted-foreground) 55%, transparent)"
-      />
-      <Controls showInteractive={false} />
-    </ReactFlow>
+const MIN_ZOOM = 0.25
+const MAX_ZOOM = 2
+const ZOOM_STEP = 0.1
+const DEFAULT_ZOOM = 1.45
+const PAN_THRESHOLD = 4
+const BASE_CARD_WIDTH = 280
+
+const DROP_ANIMATION: DropAnimation = {
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.5" } },
+  }),
+}
+
+function sortCalls(calls: Call[]) {
+  return [...calls].sort(
+    (a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name)
   )
 }
 
-/** Full-width dotted zoom/pan surface under the overview (calls graph later). */
-export function WorkflowCanvas() {
+function clampZoom(value: number) {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Math.round(value * 100) / 100))
+}
+
+function callCardStyle(zoom: number): CSSProperties {
+  return {
+    width: BASE_CARD_WIDTH * zoom,
+    gap: 8 * zoom,
+    paddingLeft: 12 * zoom,
+    paddingRight: 12 * zoom,
+    paddingTop: 10 * zoom,
+    paddingBottom: 10 * zoom,
+    fontSize: 14 * zoom,
+    borderRadius: 8 * zoom,
+  }
+}
+
+function SortableCallCard({ call, zoom }: { call: Call; zoom: number }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: call.id })
+
   return (
-    <div className="h-[600px] w-full overflow-hidden rounded-xl border bg-card">
-      <ReactFlowProvider>
-        <WorkflowCanvasInner />
-      </ReactFlowProvider>
+    <div
+      ref={setNodeRef}
+      data-no-pan
+      style={{
+        ...callCardStyle(zoom),
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={cn(
+        "flex cursor-grab touch-none items-center border bg-card font-medium shadow-sm active:cursor-grabbing",
+        isDragging && "opacity-40"
+      )}
+      {...attributes}
+      {...listeners}
+    >
+      <span className="shrink-0 text-muted-foreground" aria-hidden>
+        <GripVerticalIcon style={{ width: 16 * zoom, height: 16 * zoom }} />
+      </span>
+      <p className="min-w-0 flex-1 truncate text-foreground">{call.name}</p>
+    </div>
+  )
+}
+
+function CallCardOverlay({ call, zoom }: { call: Call; zoom: number }) {
+  return (
+    <div
+      style={callCardStyle(zoom)}
+      className="flex cursor-grabbing items-center border bg-card font-medium shadow-lg ring-1 ring-foreground/10"
+    >
+      <span className="shrink-0 text-muted-foreground" aria-hidden>
+        <GripVerticalIcon style={{ width: 16 * zoom, height: 16 * zoom }} />
+      </span>
+      <p className="min-w-0 flex-1 truncate text-foreground">{call.name}</p>
+    </div>
+  )
+}
+
+function CanvasControls({
+  zoom,
+  onZoomIn,
+  onZoomOut,
+  onFit,
+}: {
+  zoom: number
+  onZoomIn: () => void
+  onZoomOut: () => void
+  onFit: () => void
+}) {
+  return (
+    <div
+      data-no-pan
+      className="absolute bottom-4 left-4 z-20 flex flex-col overflow-hidden rounded-lg border bg-card shadow-md"
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-10 rounded-none border-b [&_svg:not([class*='size-'])]:size-5"
+        aria-label="Zoom in"
+        disabled={zoom >= MAX_ZOOM}
+        onClick={onZoomIn}
+      >
+        <ZoomInIcon />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-10 rounded-none border-b [&_svg:not([class*='size-'])]:size-5"
+        aria-label="Zoom out"
+        disabled={zoom <= MIN_ZOOM}
+        onClick={onZoomOut}
+      >
+        <ZoomOutIcon />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-10 rounded-none [&_svg:not([class*='size-'])]:size-5"
+        aria-label="Fit view"
+        onClick={onFit}
+      >
+        <Maximize2Icon />
+      </Button>
+    </div>
+  )
+}
+
+/** Vertical sortable list of workflow calls (name only). */
+export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
+  const callsQuery = useCalls(workflowId)
+  const reorderMutation = useReorderCalls(workflowId)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [isPanning, setIsPanning] = useState(false)
+  const panSessionRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    originX: number
+    originY: number
+    moved: boolean
+  } | null>(null)
+
+  const orderedCalls = useMemo(
+    () => sortCalls(callsQuery.data ?? []),
+    [callsQuery.data]
+  )
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const zoomIn = useCallback(() => {
+    setZoom((value) => clampZoom(value + ZOOM_STEP))
+  }, [])
+
+  const zoomOut = useCallback(() => {
+    setZoom((value) => clampZoom(value - ZOOM_STEP))
+  }, [])
+
+  const fitView = useCallback(() => {
+    setZoom(DEFAULT_ZOOM)
+    setPan({ x: 0, y: 0 })
+  }, [])
+
+  const onWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const delta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+    setZoom((value) => clampZoom(value + delta))
+  }, [])
+
+  const onPointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return
+      const target = event.target as HTMLElement | null
+      if (target?.closest("[data-no-pan]")) return
+
+      panSessionRef.current = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        originX: pan.x,
+        originY: pan.y,
+        moved: false,
+      }
+    },
+    [pan.x, pan.y]
+  )
+
+  const onPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const session = panSessionRef.current
+    if (!session || session.pointerId !== event.pointerId) return
+
+    const dx = event.clientX - session.startX
+    const dy = event.clientY - session.startY
+    if (!session.moved) {
+      if (Math.hypot(dx, dy) < PAN_THRESHOLD) return
+      session.moved = true
+      setIsPanning(true)
+      event.currentTarget.setPointerCapture(event.pointerId)
+    }
+
+    setPan({
+      x: session.originX + dx,
+      y: session.originY + dy,
+    })
+  }, [])
+
+  const endPan = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const session = panSessionRef.current
+    if (!session || session.pointerId !== event.pointerId) return
+    panSessionRef.current = null
+    setIsPanning(false)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId)
+    }
+  }, [])
+
+  const onDragStart = (event: DragStartEvent) => {
+    setActiveId(String(event.active.id))
+  }
+
+  const onDragEnd = (event: DragEndEvent) => {
+    setActiveId(null)
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const ids = orderedCalls.map((call) => call.id)
+    const from = ids.indexOf(String(active.id))
+    const to = ids.indexOf(String(over.id))
+    if (from < 0 || to < 0) return
+    reorderMutation.mutate(arrayMove(ids, from, to))
+  }
+
+  const active = orderedCalls.find((call) => call.id === activeId)
+  const empty = callsQuery.isSuccess && orderedCalls.length === 0
+  const connectorHeight = 32 * zoom
+  const dotSize = 16 * zoom
+
+  return (
+    <div className="relative h-[600px] w-full overflow-hidden rounded-xl border bg-card">
+      <div
+        className={cn(
+          "h-full w-full touch-none overflow-hidden",
+          isPanning ? "cursor-grabbing" : "cursor-grab"
+        )}
+        onWheel={onWheel}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{
+            backgroundImage:
+              "radial-gradient(color-mix(in oklch, var(--muted-foreground) 45%, transparent) 1.25px, transparent 1.25px)",
+            backgroundSize: `${dotSize}px ${dotSize}px`,
+            backgroundPosition: `${pan.x}px ${pan.y}px`,
+          }}
+        />
+        {/* Pan via relative left/top — no CSS transform/zoom on the DnD tree. */}
+        <div className="flex h-full w-full items-center justify-center">
+          <div
+            className="relative z-10 px-6 py-8"
+            style={{ left: pan.x, top: pan.y }}
+          >
+            {callsQuery.isLoading ? (
+              <p className="text-center text-sm text-muted-foreground">
+                Loading…
+              </p>
+            ) : callsQuery.error ? (
+              <p className="text-center text-sm text-destructive">
+                {callsQuery.error.message}
+              </p>
+            ) : empty ? (
+              <p className="text-center text-sm text-muted-foreground">
+                No calls yet. Add a call to see it here.
+              </p>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                onDragCancel={() => setActiveId(null)}
+              >
+                <SortableContext
+                  items={orderedCalls.map((call) => call.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <ul className="flex flex-col items-center">
+                    {orderedCalls.map((call, index) => (
+                      <li
+                        key={call.id}
+                        className="relative"
+                        style={
+                          index > 0
+                            ? { paddingTop: connectorHeight }
+                            : undefined
+                        }
+                      >
+                        {index > 0 ? (
+                          <div
+                            aria-hidden
+                            className="absolute left-1/2 w-px -translate-x-1/2 bg-muted-foreground/40"
+                            style={{ top: 0, height: connectorHeight }}
+                          />
+                        ) : null}
+                        <SortableCallCard call={call} zoom={zoom} />
+                      </li>
+                    ))}
+                  </ul>
+                </SortableContext>
+                <DragOverlay dropAnimation={DROP_ANIMATION}>
+                  {active ? (
+                    <CallCardOverlay call={active} zoom={zoom} />
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            )}
+          </div>
+        </div>
+      </div>
+      <CanvasControls
+        zoom={zoom}
+        onZoomIn={zoomIn}
+        onZoomOut={zoomOut}
+        onFit={fitView}
+      />
     </div>
   )
 }
