@@ -8,6 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty"
 import { IncidentDetailDrawer } from "@/components/incident/incident-detail-drawer"
 import { IncidentRow } from "@/components/incident/incident-row"
 import { IncidentsListDrawer } from "@/components/incident/incidents-list-drawer"
@@ -18,6 +25,7 @@ import {
   useActiveIncidents,
 } from "@/lib/incident/hooks"
 import { SHEET_CLOSE_MS } from "@/components/ui/sheet"
+import { CheckCircle2Icon } from "lucide-react"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 
@@ -46,12 +54,10 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
   if (incidentsQuery.isLoading || incidentsQuery.isError) {
     return null
   }
-  if (members.length === 0) {
-    return null
-  }
 
   const preview = members.slice(0, PREVIEW_LIMIT)
   const hasMore = total > PREVIEW_LIMIT
+  const isEmpty = members.length === 0
 
   const openDetail = (id: string) => {
     setDetailId(id)
@@ -86,25 +92,39 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
             <CardTitle>Incidents</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="flex flex-col">
-              {preview.map((incident) => (
-                <IncidentRow
-                  key={incident.id}
-                  incident={incident}
-                  callName={
-                    incident.callId
-                      ? callNameById.get(incident.callId)
-                      : undefined
-                  }
-                  acknowledging={
-                    acknowledgeMutation.isPending &&
-                    acknowledgeMutation.variables === incident.id
-                  }
-                  onOpen={() => openDetail(incident.id)}
-                  onAcknowledge={handleAcknowledge}
-                />
-              ))}
-            </ul>
+            {isEmpty ? (
+              <Empty className="border-0 p-4 md:p-6">
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <CheckCircle2Icon />
+                  </EmptyMedia>
+                  <EmptyTitle>No active incidents</EmptyTitle>
+                  <EmptyDescription>
+                    This workflow is healthy right now.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            ) : (
+              <ul className="flex flex-col">
+                {preview.map((incident) => (
+                  <IncidentRow
+                    key={incident.id}
+                    incident={incident}
+                    callName={
+                      incident.callId
+                        ? callNameById.get(incident.callId)
+                        : undefined
+                    }
+                    acknowledging={
+                      acknowledgeMutation.isPending &&
+                      acknowledgeMutation.variables === incident.id
+                    }
+                    onOpen={() => openDetail(incident.id)}
+                    onAcknowledge={handleAcknowledge}
+                  />
+                ))}
+              </ul>
+            )}
           </CardContent>
           {hasMore ? (
             <CardFooter className="border-t pt-3">
