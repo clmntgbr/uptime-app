@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WorkflowCharts } from "@/components/workflow/workflow-charts"
+import { WorkflowCanvas } from "@/components/workflow/workflow-canvas"
 import { WorkflowDrawer } from "@/components/workflow/workflow-drawer"
 import { WorkflowStats } from "@/components/workflow/workflow-stats"
 import { WorkflowVariablesDrawer } from "@/components/workflow/workflow-variables-drawer"
@@ -247,6 +248,7 @@ export default function WorkflowPage() {
         />
         <WorkflowCharts workflowId={workflow.id} />
         <WorkflowIncidentsCard workflowId={workflow.id} />
+        <WorkflowCanvas />
       </TabsContent>
 
       <TabsContent value="runs" className="pt-4 text-sm">
