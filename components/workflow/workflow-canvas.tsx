@@ -33,12 +33,12 @@ import {
 } from "lucide-react"
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
   type CSSProperties,
   type PointerEvent,
-  type WheelEvent,
 } from "react"
 
 const MIN_ZOOM = 0.25
@@ -185,6 +185,7 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const panSessionRef = useRef<{
     pointerId: number
     startX: number
@@ -219,10 +220,19 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
     setPan({ x: 0, y: 0 })
   }, [])
 
-  const onWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    const delta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
-    setZoom((value) => clampZoom(value + delta))
+  // React onWheel is passive — native non-passive listener blocks page scroll.
+  useEffect(() => {
+    const node = viewportRef.current
+    if (!node) return
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const delta = event.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+      setZoom((value) => clampZoom(value + delta))
+    }
+
+    node.addEventListener("wheel", onWheel, { passive: false })
+    return () => node.removeEventListener("wheel", onWheel)
   }, [])
 
   const onPointerDown = useCallback(
@@ -295,11 +305,11 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
   return (
     <div className="relative h-[600px] w-full overflow-hidden rounded-xl border bg-card">
       <div
+        ref={viewportRef}
         className={cn(
-          "h-full w-full touch-none overflow-hidden",
+          "h-full w-full touch-none overflow-hidden overscroll-none",
           isPanning ? "cursor-grabbing" : "cursor-grab"
         )}
-        onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endPan}
