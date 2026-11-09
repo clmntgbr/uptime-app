@@ -1,8 +1,24 @@
 "use client"
 
+import { CallDrawer } from "@/components/call/call-drawer"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { VariableText } from "@/components/variable/variable-text"
-import { useCalls, useReorderCalls } from "@/lib/call/hooks"
+import {
+  useCalls,
+  useCopyCall,
+  useDeleteCall,
+  useReorderCalls,
+} from "@/lib/call/hooks"
 import type { Call } from "@/lib/call/types"
 import { cn } from "@/lib/utils"
 import {
@@ -27,8 +43,10 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
-  GripVerticalIcon,
+  CopyIcon,
   Maximize2Icon,
+  PencilIcon,
+  Trash2Icon,
   ZoomInIcon,
   ZoomOutIcon,
 } from "lucide-react"
@@ -40,6 +58,7 @@ import {
   useState,
   type CSSProperties,
   type PointerEvent,
+  type ReactNode,
 } from "react"
 
 const MIN_ZOOM = 0.25
@@ -48,6 +67,9 @@ const ZOOM_STEP = 0.1
 const DEFAULT_ZOOM = 1.25
 const PAN_THRESHOLD = 4
 const BASE_CARD_WIDTH = 280
+const CARD_RADIUS = 16
+/** Fan along the top-right corner arc (degrees from +X, CCW). */
+const CORNER_FAN_ANGLES = [88, 45, 2] as const
 
 const DROP_ANIMATION: DropAnimation = {
   sideEffects: defaultDropAnimationSideEffects({
@@ -57,7 +79,8 @@ const DROP_ANIMATION: DropAnimation = {
 
 function sortCalls(calls: Call[]) {
   return [...calls].sort(
-    (a, b) => (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name)
+    (a, b) =>
+      (a.position ?? 0) - (b.position ?? 0) || a.name.localeCompare(b.name)
   )
 }
 
@@ -74,7 +97,25 @@ function callCardStyle(zoom: number): CSSProperties {
     paddingTop: 10 * zoom,
     paddingBottom: 10 * zoom,
     fontSize: 14 * zoom,
-    borderRadius: 8 * zoom,
+    borderRadius: CARD_RADIUS * zoom,
+  }
+}
+
+function cornerFanStyle(
+  zoom: number,
+  angleDeg: number,
+  buttonSize: number
+): CSSProperties {
+  const radius = CARD_RADIUS * zoom
+  const edgeGap = 2 * zoom
+  const orbit = radius + edgeGap + buttonSize / 2
+  const rad = (angleDeg * Math.PI) / 180
+  // Arc center of the top-right rounded corner, from the box's top-right.
+  const x = -radius + Math.cos(rad) * orbit
+  const y = radius - Math.sin(rad) * orbit
+  return {
+    top: y - buttonSize / 2,
+    left: `calc(100% + ${x - buttonSize / 2}px)`,
   }
 }
 
@@ -118,9 +159,6 @@ function StatusDot({
 function CallCardBody({ call, zoom }: { call: Call; zoom: number }) {
   return (
     <>
-      <span className="shrink-0 self-center text-muted-foreground" aria-hidden>
-        <GripVerticalIcon style={{ width: 16 * zoom, height: 16 * zoom }} />
-      </span>
       <div className="min-w-0 flex-1">
         <p className="truncate text-foreground">{call.name}</p>
         <span
@@ -135,7 +173,66 @@ function CallCardBody({ call, zoom }: { call: Call; zoom: number }) {
   )
 }
 
-function SortableCallCard({ call, zoom }: { call: Call; zoom: number }) {
+function CallHoverAction({
+  label,
+  zoom,
+  style,
+  onClick,
+  destructive,
+  children,
+}: {
+  label: string
+  zoom: number
+  style: CSSProperties
+  onClick: () => void
+  destructive?: boolean
+  children: ReactNode
+}) {
+  const size = 20 * zoom
+  const icon = 11 * zoom
+
+  return (
+    <button
+      type="button"
+      data-no-pan
+      aria-label={label}
+      title={label}
+      className={cn(
+        "absolute z-10 flex items-center justify-center rounded-full border bg-card shadow-sm",
+        "hover:z-20",
+        destructive
+          ? "text-destructive hover:bg-destructive/10"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+      )}
+      style={{ width: size, height: size, ...style }}
+      onPointerDown={(event) => {
+        event.stopPropagation()
+      }}
+      onClick={(event) => {
+        event.stopPropagation()
+        onClick()
+      }}
+    >
+      <span style={{ width: icon, height: icon }} className="[&_svg]:size-full">
+        {children}
+      </span>
+    </button>
+  )
+}
+
+function SortableCallCard({
+  call,
+  zoom,
+  onEdit,
+  onCopy,
+  onDelete,
+}: {
+  call: Call
+  zoom: number
+  onEdit: () => void
+  onCopy: () => void
+  onDelete: () => void
+}) {
   const {
     attributes,
     listeners,
@@ -145,23 +242,60 @@ function SortableCallCard({ call, zoom }: { call: Call; zoom: number }) {
     isDragging,
   } = useSortable({ id: call.id })
 
+  // Fan along the rounded top-right corner (matches the card radius).
+  const size = 20 * zoom
+  const actions = [
+    {
+      label: "Delete",
+      onClick: onDelete,
+      destructive: true,
+      icon: <Trash2Icon />,
+      style: cornerFanStyle(zoom, CORNER_FAN_ANGLES[0], size),
+    },
+    {
+      label: "Copy",
+      onClick: onCopy,
+      icon: <CopyIcon />,
+      style: cornerFanStyle(zoom, CORNER_FAN_ANGLES[1], size),
+    },
+    {
+      label: "Edit",
+      onClick: onEdit,
+      icon: <PencilIcon />,
+      style: cornerFanStyle(zoom, CORNER_FAN_ANGLES[2], size),
+    },
+  ] as const
+
   return (
     <div
       ref={setNodeRef}
       data-no-pan
       style={{
-        ...callCardStyle(zoom),
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={cn(
-        "flex cursor-grab touch-none items-center border bg-card font-medium shadow-sm active:cursor-grabbing",
-        isDragging && "opacity-40"
-      )}
-      {...attributes}
-      {...listeners}
+      className={cn("relative", isDragging && "opacity-40")}
     >
-      <CallCardBody call={call} zoom={zoom} />
+      {actions.map((action) => (
+        <CallHoverAction
+          key={action.label}
+          label={action.label}
+          zoom={zoom}
+          style={action.style}
+          destructive={"destructive" in action && action.destructive}
+          onClick={action.onClick}
+        >
+          {action.icon}
+        </CallHoverAction>
+      ))}
+      <div
+        style={callCardStyle(zoom)}
+        className="flex cursor-grab touch-none items-center border bg-card font-medium shadow-sm active:cursor-grabbing"
+        {...attributes}
+        {...listeners}
+      >
+        <CallCardBody call={call} zoom={zoom} />
+      </div>
     </div>
   )
 }
@@ -229,11 +363,16 @@ function CanvasControls({
   )
 }
 
-/** Vertical sortable list of workflow calls (name only). */
+/** Vertical sortable list of workflow calls. */
 export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
   const callsQuery = useCalls(workflowId)
   const reorderMutation = useReorderCalls(workflowId)
+  const copyMutation = useCopyCall(workflowId)
+  const deleteMutation = useDeleteCall(workflowId)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editedId, setEditedId] = useState<string | null>(null)
+  const [callToDelete, setCallToDelete] = useState<Call | null>(null)
   const [zoom, setZoom] = useState(DEFAULT_ZOOM)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
@@ -354,6 +493,19 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
   const connectorHeight = 32 * zoom
   const dotSize = 16 * zoom
 
+  const openEdit = (callId: string) => {
+    setEditedId(callId)
+    setDrawerOpen(true)
+  }
+
+  const confirmDelete = () => {
+    const id = callToDelete?.id
+    if (!id) return
+    deleteMutation.mutate(id, {
+      onSuccess: () => setCallToDelete(null),
+    })
+  }
+
   return (
     <div className="relative h-[600px] w-full overflow-hidden rounded-xl border bg-card">
       <div
@@ -425,7 +577,13 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
                             style={{ top: 0, height: connectorHeight }}
                           />
                         ) : null}
-                        <SortableCallCard call={call} zoom={zoom} />
+                        <SortableCallCard
+                          call={call}
+                          zoom={zoom}
+                          onEdit={() => openEdit(call.id)}
+                          onCopy={() => copyMutation.mutate(call.id)}
+                          onDelete={() => setCallToDelete(call)}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -445,6 +603,48 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onFit={fitView}
+      />
+
+      <AlertDialog
+        open={callToDelete != null}
+        onOpenChange={(open) => {
+          if (!open) setCallToDelete(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete call?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete{" "}
+              <span className="font-medium text-foreground">
+                {callToDelete?.name}
+              </span>
+              . This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={(event) => {
+                event.preventDefault()
+                confirmDelete()
+              }}
+            >
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <CallDrawer
+        workflowId={workflowId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        callId={editedId}
       />
     </div>
   )
