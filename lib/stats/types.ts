@@ -31,8 +31,8 @@ export interface CallDayCounts {
   failed: number
   error: number
   skipped: number
-  /** p95 of per-call timings.total that day; null when none finished. */
-  latencyP95Ms: number | null
+  /** Mean of per-call timings.total that day; null when none finished. */
+  latencyAvgMs: number | null
 }
 
 export interface CallCounts {
@@ -72,7 +72,7 @@ export interface DashboardStats {
   runs: RunCounts
   calls: CallCounts
   successRate: number
-  latencyP95Ms: number | null
+  latencyAvgMs: number | null
   openIncident: boolean
   incidents: IncidentRange[]
   callDurations: CallDurationSeries[]

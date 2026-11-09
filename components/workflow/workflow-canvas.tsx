@@ -1,6 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { VariableText } from "@/components/variable/variable-text"
 import { useCalls, useReorderCalls } from "@/lib/call/hooks"
 import type { Call } from "@/lib/call/types"
 import { cn } from "@/lib/utils"
@@ -44,7 +45,7 @@ import {
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 2
 const ZOOM_STEP = 0.1
-const DEFAULT_ZOOM = 1.45
+const DEFAULT_ZOOM = 1.25
 const PAN_THRESHOLD = 4
 const BASE_CARD_WIDTH = 280
 
@@ -77,6 +78,63 @@ function callCardStyle(zoom: number): CSSProperties {
   }
 }
 
+function statusDotClass(status: string | undefined) {
+  if (status === "success") return "bg-[#8FD2B0] dark:bg-emerald-400/80"
+  if (status === "failed") return "bg-orange-400 dark:bg-orange-400/90"
+  if (status === "error") return "bg-red-500 dark:bg-red-400"
+  if (status === "skipped") return "bg-muted-foreground/35"
+  if (status === "running") return "bg-sky-400"
+  return "bg-muted-foreground/30"
+}
+
+function statusLabel(status: string | undefined) {
+  if (status === "success") return "Success"
+  if (status === "failed" || status === "error") return "Failed"
+  if (status === "running") return "Running"
+  if (status === "skipped") return "Skipped"
+  return "Never"
+}
+
+function StatusDot({
+  status,
+  zoom,
+  className,
+}: {
+  status: string | undefined
+  zoom: number
+  className?: string
+}) {
+  const size = 7 * zoom
+  return (
+    <span
+      className={cn("shrink-0 rounded-full", statusDotClass(status), className)}
+      style={{ width: size, height: size }}
+      title={statusLabel(status)}
+      aria-label={statusLabel(status)}
+    />
+  )
+}
+
+function CallCardBody({ call, zoom }: { call: Call; zoom: number }) {
+  return (
+    <>
+      <span className="shrink-0 self-center text-muted-foreground" aria-hidden>
+        <GripVerticalIcon style={{ width: 16 * zoom, height: 16 * zoom }} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-foreground">{call.name}</p>
+        <span
+          className="block truncate font-normal text-muted-foreground"
+          style={{ fontSize: `${12 * zoom}px` }}
+        >
+          <VariableText text={call.url || "—"} />
+        </span>
+      </div>
+      <StatusDot status={call.lastStatus} zoom={zoom} className="self-center" />
+    </>
+  )
+}
+
 function SortableCallCard({ call, zoom }: { call: Call; zoom: number }) {
   const {
     attributes,
@@ -103,10 +161,7 @@ function SortableCallCard({ call, zoom }: { call: Call; zoom: number }) {
       {...attributes}
       {...listeners}
     >
-      <span className="shrink-0 text-muted-foreground" aria-hidden>
-        <GripVerticalIcon style={{ width: 16 * zoom, height: 16 * zoom }} />
-      </span>
-      <p className="min-w-0 flex-1 truncate text-foreground">{call.name}</p>
+      <CallCardBody call={call} zoom={zoom} />
     </div>
   )
 }
@@ -117,10 +172,7 @@ function CallCardOverlay({ call, zoom }: { call: Call; zoom: number }) {
       style={callCardStyle(zoom)}
       className="flex cursor-grabbing items-center border bg-card font-medium shadow-lg ring-1 ring-foreground/10"
     >
-      <span className="shrink-0 text-muted-foreground" aria-hidden>
-        <GripVerticalIcon style={{ width: 16 * zoom, height: 16 * zoom }} />
-      </span>
-      <p className="min-w-0 flex-1 truncate text-foreground">{call.name}</p>
+      <CallCardBody call={call} zoom={zoom} />
     </div>
   )
 }

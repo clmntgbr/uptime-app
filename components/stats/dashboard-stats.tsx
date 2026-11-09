@@ -25,26 +25,25 @@ import {
 } from "@/lib/stats/format"
 import { useDashboardStats, useRelativeTime } from "@/lib/stats/hooks"
 
-function LatencyP95Label() {
+function LatencyAvgLabel() {
   return (
     <span className="inline-flex items-center gap-1">
-      Latency p95
+      Avg latency
       <HoverCard>
         <HoverCardTrigger asChild>
           <button
             type="button"
             className="inline-flex size-3.5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:outline-none"
-            aria-label="What is latency p95?"
+            aria-label="What is average latency?"
           >
             <CircleHelpIcon className="size-3.5" />
           </button>
         </HoverCardTrigger>
         <HoverCardContent side="top" align="start" className="w-64 space-y-1.5">
-          <p className="font-medium text-foreground">Latency p95</p>
+          <p className="font-medium text-foreground">Average latency</p>
           <p className="text-muted-foreground">
-            The 95th percentile of finished run durations over the last 24
-            hours. 95% of runs completed at or below this time; the slowest 5%
-            took longer.
+            Mean per-call response time over the last 24 hours (successful,
+            failed, and error calls with a measured duration).
           </p>
         </HoverCardContent>
       </HoverCard>
@@ -212,7 +211,7 @@ export function DashboardStats({
     )
   }
 
-  const { runs, calls, successRate, latencyP95Ms } = statsQuery.data
+  const { runs, calls, successRate, latencyAvgMs } = statsQuery.data
   const runsValue = countWithFailures(runs.total, runs.failed, runs.error)
   const callsValue = countWithFailures(calls.total, calls.failed, calls.error)
 
@@ -226,8 +225,8 @@ export function DashboardStats({
         />
         <StatCard description="Runs" value={runsValue} badge="24h" />
         <StatCard
-          description={<LatencyP95Label />}
-          value={formatLatencyMs(latencyP95Ms)}
+          description={<LatencyAvgLabel />}
+          value={formatLatencyMs(latencyAvgMs)}
           badge="24h"
         />
         {workflowId ? (
