@@ -523,39 +523,41 @@ function CallVariableForm({
       {source !== "status" && (
         <div className="flex flex-col gap-2">
           <Label htmlFor="call-variable-path">Path</Label>
-          <Input
-            id="call-variable-path"
-            value={path}
-            onChange={(event) => setPath(event.target.value)}
-            onFocus={() => setPathFocused(true)}
-            onBlur={() => {
-              // Let mousedown on a suggestion apply before closing.
-              window.setTimeout(() => setPathFocused(false), 150)
-            }}
-            placeholder={sourceHint}
-            maxLength={512}
-            required
-            autoComplete="off"
-          />
-          {showSuggestions && (
-            <ul className="max-h-40 overflow-y-auto rounded-md border bg-popover">
-              {suggestions.map((key) => (
-                <li key={key}>
-                  <button
-                    type="button"
-                    className="w-full px-3 py-1.5 text-start hover:bg-muted"
-                    onMouseDown={(event) => {
-                      event.preventDefault()
-                      setPath(toJsonPath(key))
-                      setPathFocused(false)
-                    }}
-                  >
-                    {toJsonPath(key)}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="relative">
+            <Input
+              id="call-variable-path"
+              value={path}
+              onChange={(event) => setPath(event.target.value)}
+              onFocus={() => setPathFocused(true)}
+              onBlur={() => {
+                // Let mousedown on a suggestion apply before closing.
+                window.setTimeout(() => setPathFocused(false), 150)
+              }}
+              placeholder={sourceHint}
+              maxLength={512}
+              required
+              autoComplete="off"
+            />
+            {showSuggestions ? (
+              <ul className="absolute inset-x-0 top-full z-20 mt-1 max-h-40 overflow-y-auto rounded-md border bg-popover shadow-md">
+                {suggestions.map((key) => (
+                  <li key={key}>
+                    <button
+                      type="button"
+                      className="w-full px-3 py-1.5 text-start hover:bg-muted"
+                      onMouseDown={(event) => {
+                        event.preventDefault()
+                        setPath(toJsonPath(key))
+                        setPathFocused(false)
+                      }}
+                    >
+                      {toJsonPath(key)}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
           {source === "json" &&
             pathFocused &&
             !responseKeysQuery.isLoading &&

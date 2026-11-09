@@ -1,9 +1,11 @@
 "use client"
 
+import { SuggestibleInput } from "@/components/call/suggestible-input"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { VariableInput } from "@/components/variable/variable-input"
+import type { CallSuggestionKind } from "@/lib/call/suggestions"
 import { AvailableVariable } from "@/lib/variable/types"
 import { PlusIcon, Trash2Icon } from "lucide-react"
 
@@ -18,6 +20,8 @@ interface KeyValueEditorProps {
   pairs: KeyValuePair[]
   onChange: (pairs: KeyValuePair[]) => void
   variables: AvailableVariable[]
+  workflowId?: string
+  keySuggestionKind?: CallSuggestionKind
   keyPlaceholder?: string
   valuePlaceholder?: string
   addLabel?: string
@@ -46,6 +50,8 @@ export function KeyValueEditor({
   pairs,
   onChange,
   variables,
+  workflowId,
+  keySuggestionKind,
   keyPlaceholder = "Key",
   valuePlaceholder = "Value",
   addLabel = "Add entry",
@@ -68,15 +74,28 @@ export function KeyValueEditor({
             key={`${label}-${index}`}
             className="flex items-center gap-2"
           >
-            <Input
-              value={pair.key}
-              onChange={(event) =>
-                updatePair(index, { key: event.target.value })
-              }
-              placeholder={keyPlaceholder}
-              className="h-9 min-w-0 flex-1 bg-background dark:bg-background"
-              autoComplete="off"
-            />
+            <div className="min-w-0 flex-1">
+              {workflowId && keySuggestionKind ? (
+                <SuggestibleInput
+                  workflowId={workflowId}
+                  kind={keySuggestionKind}
+                  value={pair.key}
+                  onChange={(key) => updatePair(index, { key })}
+                  placeholder={keyPlaceholder}
+                  className="h-9 bg-background dark:bg-background"
+                />
+              ) : (
+                <Input
+                  value={pair.key}
+                  onChange={(event) =>
+                    updatePair(index, { key: event.target.value })
+                  }
+                  placeholder={keyPlaceholder}
+                  className="h-9 bg-background dark:bg-background"
+                  autoComplete="off"
+                />
+              )}
+            </div>
             <div className="min-w-0 flex-1">
               <VariableInput
                 value={pair.value}

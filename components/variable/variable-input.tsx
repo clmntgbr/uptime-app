@@ -77,46 +77,44 @@ export function VariableInput({
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <div className="relative">
-        <Input
-          {...props}
-          ref={inputRef}
-          value={value}
-          placeholder={undefined}
-          autoComplete="off"
-          className={cn("text-transparent caret-foreground", className)}
-          onChange={(event) => {
-            onChange(event.target.value)
-            setCursor(event.target.selectionStart ?? event.target.value.length)
-          }}
-          onClick={syncCursor}
-          onKeyUp={syncCursor}
-          onSelect={syncCursor}
-          onFocus={(event) => {
-            setFocused(true)
-            syncCursor()
-            onFocus?.(event)
-          }}
-          onBlur={(event) => {
-            // Let mousedown on a suggestion apply before closing.
-            window.setTimeout(() => setFocused(false), 150)
-            onBlur?.(event)
-          }}
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 z-10 flex items-center overflow-hidden px-2 text-sm text-foreground md:text-xs/relaxed"
-        >
-          {value ? (
-            <VariableText text={value} className="truncate whitespace-pre" />
-          ) : placeholder ? (
-            <span className="truncate text-muted-foreground">{placeholder}</span>
-          ) : null}
-        </div>
+    <div className="relative">
+      <Input
+        {...props}
+        ref={inputRef}
+        value={value}
+        placeholder={undefined}
+        autoComplete="off"
+        className={cn("text-transparent caret-foreground", className)}
+        onChange={(event) => {
+          onChange(event.target.value)
+          setCursor(event.target.selectionStart ?? event.target.value.length)
+        }}
+        onClick={syncCursor}
+        onKeyUp={syncCursor}
+        onSelect={syncCursor}
+        onFocus={(event) => {
+          setFocused(true)
+          syncCursor()
+          onFocus?.(event)
+        }}
+        onBlur={(event) => {
+          // Let mousedown on a suggestion apply before closing.
+          window.setTimeout(() => setFocused(false), 150)
+          onBlur?.(event)
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-10 flex items-center overflow-hidden px-2 text-sm text-foreground md:text-xs/relaxed"
+      >
+        {value ? (
+          <VariableText text={value} className="truncate whitespace-pre" />
+        ) : placeholder ? (
+          <span className="truncate text-muted-foreground">{placeholder}</span>
+        ) : null}
       </div>
-      {suggestions.length > 0 && (
-        <ul className="max-h-40 overflow-y-auto rounded-md border bg-popover">
+      {suggestions.length > 0 ? (
+        <ul className="absolute inset-x-0 top-full z-20 mt-1 max-h-40 overflow-y-auto rounded-md border bg-popover shadow-md">
           {suggestions.map((variable) => (
             <li key={`${variable.type}-${variable.name}`}>
               <button
@@ -133,7 +131,7 @@ export function VariableInput({
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </div>
   )
 }
