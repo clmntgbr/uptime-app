@@ -199,6 +199,8 @@ function CallHoverAction({
       title={label}
       className={cn(
         "absolute z-10 flex items-center justify-center rounded-full border bg-card shadow-sm",
+        "opacity-0 transition-opacity duration-150",
+        "group-hover/card:opacity-100 group-focus-within/card:opacity-100",
         "hover:z-20",
         destructive
           ? "text-destructive hover:bg-destructive/10"
@@ -244,6 +246,7 @@ function SortableCallCard({
 
   // Fan along the rounded top-right corner (matches the card radius).
   const size = 20 * zoom
+  const hoverPad = size + 4 * zoom
   const actions = [
     {
       label: "Delete",
@@ -274,8 +277,19 @@ function SortableCallCard({
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={cn("relative", isDragging && "opacity-40")}
+      className={cn("group/card relative", isDragging && "opacity-40")}
     >
+      {/* Keeps :hover while moving from the card to the exterior fan buttons. */}
+      <div
+        aria-hidden
+        className="absolute"
+        style={{
+          top: -hoverPad,
+          right: -hoverPad,
+          width: hoverPad + CARD_RADIUS * zoom,
+          height: hoverPad + CARD_RADIUS * zoom,
+        }}
+      />
       {actions.map((action) => (
         <CallHoverAction
           key={action.label}
@@ -290,7 +304,7 @@ function SortableCallCard({
       ))}
       <div
         style={callCardStyle(zoom)}
-        className="flex cursor-grab touch-none items-center border bg-card font-medium shadow-sm active:cursor-grabbing"
+        className="relative z-[1] flex cursor-grab touch-none items-center border bg-card font-medium shadow-sm active:cursor-grabbing"
         {...attributes}
         {...listeners}
       >
