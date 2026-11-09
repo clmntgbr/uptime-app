@@ -27,8 +27,20 @@ import {
 import type { ExpiryPolicy, ExpiryType } from "@/lib/expiry/types"
 import { cn } from "@/lib/utils"
 import { XIcon } from "lucide-react"
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { toast } from "sonner"
+
+export type ExpiryPolicyCardHandle = {
+  save: () => Promise<void>
+}
 
 function sameDays(a: number[], b: number[]) {
   if (a.length !== b.length) return false
@@ -57,15 +69,19 @@ function serverSnapshot(
   })
 }
 
-export function ExpiryPolicyCard({
-  workflowId,
-  type,
-  readOnly = false,
-}: {
-  workflowId: string
-  type: ExpiryType
-  readOnly?: boolean
-}) {
+export const ExpiryPolicyCard = forwardRef<
+  ExpiryPolicyCardHandle,
+  {
+    workflowId: string
+    type: ExpiryType
+    readOnly?: boolean
+    /** Hide Reset/Save — parent form saves via ref. */
+    hideActions?: boolean
+  }
+>(function ExpiryPolicyCard(
+  { workflowId, type, readOnly = false, hideActions = false },
+  ref
+) {
   const titleId = useId()
   const meta = EXPIRY_TYPES[type]
   const policiesQuery = useExpiryPolicies(workflowId)
@@ -94,6 +110,8 @@ export function ExpiryPolicyCard({
   const [saveNetworkError, setSaveNetworkError] = useState(false)
   const lastServerRef = useRef<string>("")
   const appliedFormRef = useRef<string>("")
+  const formRef = useRef({ enabled, thresholds })
+  formRef.current = { enabled, thresholds }
 
   const applyPolicy = (policy: ExpiryPolicy) => {
     const days = sortDaysDesc(policy.thresholdsDays)
@@ -174,28 +192,49 @@ export function ExpiryPolicyCard({
     setDraft("")
   }
 
-  const handleSave = () => {
-    if (emptyWhileEnabled || readOnly || remoteChanged) return
+  const handleSave = async ({ silent = false }: { silent?: boolean } = {}) => {
+    const current = formRef.current
+    const dirty =
+      formSnapshot(current.enabled, current.thresholds) !==
+      appliedFormRef.current
+    if (!dirty) return
+
+    if (current.enabled && current.thresholds.length === 0) {
+      setFieldError("Add at least one threshold, or turn alerts off.")
+      throw new Error("Expiry policy requires at least one threshold")
+    }
+    if (readOnly || remoteChanged) {
+      throw new Error("Expiry policy cannot be saved right now")
+    }
+
     setSaveNetworkError(false)
-    saveMutation.mutate(
-      { type, input: { enabled, thresholdsDays: thresholds } },
-      {
-        onSuccess: (policy) => {
-          applyPolicy(policy)
-          toast.success("Saved")
+    try {
+      const policy = await saveMutation.mutateAsync({
+        type,
+        input: {
+          enabled: current.enabled,
+          thresholdsDays: current.thresholds,
         },
-        onError: (error) => {
-          if (error instanceof ApiError) {
-            setFieldError(error.message)
-            setSaveNetworkError(false)
-            return
-          }
-          setFieldError("Failed to save expiry policy")
-          setSaveNetworkError(true)
-        },
+      })
+      applyPolicy(policy)
+      if (!silent) toast.success("Saved")
+    } catch (error) {
+      if (error instanceof ApiError) {
+        setFieldError(error.message)
+        setSaveNetworkError(false)
+      } else {
+        setFieldError("Failed to save expiry policy")
+        setSaveNetworkError(true)
       }
-    )
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to save expiry policy")
+    }
   }
+
+  useImperativeHandle(ref, () => ({
+    save: () => handleSave({ silent: true }),
+  }))
 
   const handleReset = () => {
     if (serverPolicy) applyPolicy(serverPolicy)
@@ -237,31 +276,39 @@ export function ExpiryPolicyCard({
     )
   }
 
+  const alertSwitch = (
+    <div className="flex shrink-0 items-center gap-2">
+      <Label htmlFor={`${titleId}-alert`} className="text-xs">
+        Alert me
+      </Label>
+      <Switch
+        id={`${titleId}-alert`}
+        checked={enabled}
+        disabled={readOnly}
+        onCheckedChange={(next) => {
+          setEnabled(next)
+          setFieldError(null)
+          setSaveNetworkError(false)
+        }}
+        aria-label="Alert me"
+      />
+    </div>
+  )
+
   return (
     <Card size="sm" className="bg-card" role="region" aria-labelledby={titleId}>
       <CardHeader className="border-b">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle id={titleId}>{meta.title}</CardTitle>
-            <CardDescription>{meta.help}</CardDescription>
+        {hideActions ? (
+          <div className="flex items-center justify-end">{alertSwitch}</div>
+        ) : (
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle id={titleId}>{meta.title}</CardTitle>
+              <CardDescription>{meta.help}</CardDescription>
+            </div>
+            {alertSwitch}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Label htmlFor={`${titleId}-alert`} className="text-xs">
-              Alert me
-            </Label>
-            <Switch
-              id={`${titleId}-alert`}
-              checked={enabled}
-              disabled={readOnly}
-              onCheckedChange={(next) => {
-                setEnabled(next)
-                setFieldError(null)
-                setSaveNetworkError(false)
-              }}
-              aria-label="Alert me"
-            />
-          </div>
-        </div>
+        )}
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4 pt-4">
@@ -402,7 +449,7 @@ export function ExpiryPolicyCard({
         </div>
       </CardContent>
 
-      {!readOnly ? (
+      {!readOnly && !hideActions ? (
         <CardFooter className="justify-end gap-2 border-t">
           <Button
             type="button"
@@ -422,7 +469,7 @@ export function ExpiryPolicyCard({
               remoteChanged ||
               saveMutation.isPending
             }
-            onClick={handleSave}
+            onClick={() => void handleSave()}
           >
             {saveMutation.isPending ? "Saving…" : "Save"}
           </Button>
@@ -430,4 +477,4 @@ export function ExpiryPolicyCard({
       ) : null}
     </Card>
   )
-}
+})

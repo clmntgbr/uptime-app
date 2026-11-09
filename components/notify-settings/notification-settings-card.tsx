@@ -19,8 +19,19 @@ import {
   useUpsertNotificationSettings,
 } from "@/lib/notify-settings/hooks"
 import type { NotificationSettings } from "@/lib/notify-settings/types"
-import { useEffect, useId, useRef, useState } from "react"
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react"
 import { toast } from "sonner"
+
+export type NotificationSettingsCardHandle = {
+  save: () => Promise<void>
+}
 
 function formSnapshot(s: {
   emails: string[]
@@ -43,13 +54,18 @@ function serverSnapshot(s: NotificationSettings) {
   })
 }
 
-export function NotificationSettingsCard({
-  workflowId,
-  readOnly = false,
-}: {
-  workflowId: string
-  readOnly?: boolean
-}) {
+export const NotificationSettingsCard = forwardRef<
+  NotificationSettingsCardHandle,
+  {
+    workflowId: string
+    readOnly?: boolean
+    /** Hide Reset/Save — parent form saves via ref. */
+    hideActions?: boolean
+  }
+>(function NotificationSettingsCard(
+  { workflowId, readOnly = false, hideActions = false },
+  ref
+) {
   const titleId = useId()
   const query = useNotificationSettings(workflowId)
   const saveMutation = useUpsertNotificationSettings(workflowId)
@@ -62,6 +78,8 @@ export function NotificationSettingsCard({
   const [remoteChanged, setRemoteChanged] = useState(false)
   const lastServerRef = useRef("")
   const appliedFormRef = useRef("")
+  const formRef = useRef({ emails, incidentsEnabled, tlsEnabled })
+  formRef.current = { emails, incidentsEnabled, tlsEnabled }
 
   const applySettings = (s: NotificationSettings) => {
     const nextEmails = [...(s.emails ?? [])]
@@ -103,30 +121,32 @@ export function NotificationSettingsCard({
     formSnapshot({ emails, incidentsEnabled, tlsEnabled }) !==
       appliedFormRef.current
 
-  const handleSave = () => {
+  const handleSave = async ({ silent = false }: { silent?: boolean } = {}) => {
+    const current = formRef.current
+    const dirty =
+      initialized &&
+      formSnapshot(current) !== appliedFormRef.current
+    if (!dirty) return
+
     setFieldError(null)
-    saveMutation.mutate(
-      {
-        emails,
-        incidentsEnabled,
-        tlsEnabled,
-      },
-      {
-        onSuccess: (data) => {
-          applySettings(data)
-          toast.success("Saved")
-        },
-        onError: (err) => {
-          const message =
-            err instanceof ApiError
-              ? err.message
-              : "Failed to save notification settings"
-          setFieldError(message)
-          toast.error(message)
-        },
-      }
-    )
+    try {
+      const data = await saveMutation.mutateAsync(current)
+      applySettings(data)
+      if (!silent) toast.success("Saved")
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : "Failed to save notification settings"
+      setFieldError(message)
+      toast.error(message)
+      throw err instanceof Error ? err : new Error(message)
+    }
   }
+
+  useImperativeHandle(ref, () => ({
+    save: () => handleSave({ silent: true }),
+  }))
 
   if (query.isLoading) {
     return (
@@ -161,12 +181,14 @@ export function NotificationSettingsCard({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle id={titleId}>Email</CardTitle>
-        <CardDescription>
-          Who receives mail for incidents and TLS certificate alerts.
-        </CardDescription>
-      </CardHeader>
+      {!hideActions ? (
+        <CardHeader>
+          <CardTitle id={titleId}>Email</CardTitle>
+          <CardDescription>
+            Who receives mail for incidents and TLS certificate alerts.
+          </CardDescription>
+        </CardHeader>
+      ) : null}
       <CardContent className="flex flex-col gap-5">
         <EmailRecipientsInput
           emails={emails}
@@ -225,7 +247,7 @@ export function NotificationSettingsCard({
           </p>
         )}
       </CardContent>
-      {!readOnly && (
+      {!readOnly && !hideActions ? (
         <CardFooter className="justify-end gap-2">
           <Button
             type="button"
@@ -240,15 +262,15 @@ export function NotificationSettingsCard({
           <Button
             type="button"
             disabled={!dirty || saveMutation.isPending}
-            onClick={handleSave}
+            onClick={() => void handleSave()}
           >
             {saveMutation.isPending ? "Saving…" : "Save"}
           </Button>
         </CardFooter>
-      )}
+      ) : null}
     </Card>
   )
-}
+})
 
 function FamilySwitch({
   id,

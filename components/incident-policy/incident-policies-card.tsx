@@ -38,8 +38,20 @@ import {
 import type { IncidentPolicy } from "@/lib/incident-policy/types"
 import type { IncidentKind, IncidentSeverity } from "@/lib/incident/types"
 import { cn } from "@/lib/utils"
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import {
+  forwardRef,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import { toast } from "sonner"
+
+export type IncidentPoliciesCardHandle = {
+  save: () => Promise<void>
+}
 
 function policyKey(p: IncidentPolicy): string {
   return JSON.stringify({
@@ -81,15 +93,19 @@ function mergeServerPolicies(server: IncidentPolicy[]): IncidentPolicy[] {
   })
 }
 
-export function IncidentPoliciesCard({
-  workflowId,
-  intervalSeconds,
-  readOnly = false,
-}: {
-  workflowId: string
-  intervalSeconds?: number
-  readOnly?: boolean
-}) {
+export const IncidentPoliciesCard = forwardRef<
+  IncidentPoliciesCardHandle,
+  {
+    workflowId: string
+    intervalSeconds?: number
+    readOnly?: boolean
+    /** Hide Reset/Save — parent form saves via ref. */
+    hideActions?: boolean
+  }
+>(function IncidentPoliciesCard(
+  { workflowId, intervalSeconds, readOnly = false, hideActions = false },
+  ref
+) {
   const titleId = useId()
   const query = useIncidentPolicies(workflowId)
 
@@ -98,6 +114,8 @@ export function IncidentPoliciesCard({
   const [saving, setSaving] = useState(false)
   const [rowErrors, setRowErrors] = useState<Partial<Record<IncidentKind, string>>>({})
   const baselineRef = useRef<Map<IncidentKind, string>>(new Map())
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
 
   useEffect(() => {
     if (!query.data) return
@@ -158,11 +176,15 @@ export function IncidentPoliciesCard({
     setRows((prev) => applyProfile(prev, profile))
   }
 
-  const handleSave = async () => {
-    if (dirtyRows.length === 0) return
+  const handleSave = async ({ silent = false }: { silent?: boolean } = {}) => {
+    const currentRows = rowsRef.current
+    const dirty = currentRows.filter(
+      (r) => baselineRef.current.get(r.kind) !== policyKey(r)
+    )
+    if (dirty.length === 0) return
     setSaving(true)
     const results = await Promise.allSettled(
-      dirtyRows.map((row) =>
+      dirty.map((row) =>
         upsertIncidentPolicy(workflowId, row.kind, {
           enabled: row.enabled,
           severity: row.severity,
@@ -178,7 +200,7 @@ export function IncidentPoliciesCard({
     const savedByKind = new Map<IncidentKind, IncidentPolicy>()
 
     results.forEach((result, index) => {
-      const kind = dirtyRows[index].kind
+      const kind = dirty[index].kind
       if (result.status === "fulfilled") {
         ok++
         savedByKind.set(kind, {
@@ -205,16 +227,23 @@ export function IncidentPoliciesCard({
     setRowErrors(errors)
     setSaving(false)
 
-    const total = dirtyRows.length
+    const total = dirty.length
     if (ok === total) {
-      toast.success("Saved")
+      if (!silent) toast.success("Saved")
       void query.refetch()
-    } else if (ok === 0) {
+      return
+    }
+    if (ok === 0) {
       toast.error("Failed to save incident policies")
     } else {
       toast.message(`${ok} of ${total} saved`)
     }
+    throw new Error("Failed to save some incident policies")
   }
+
+  useImperativeHandle(ref, () => ({
+    save: () => handleSave({ silent: true }),
+  }))
 
   if (query.isLoading) {
     return (
@@ -250,13 +279,21 @@ export function IncidentPoliciesCard({
 
   return (
     <Card id="workflow-incident-policies">
-      <CardHeader>
-        <CardTitle id={titleId}>Incidents</CardTitle>
-        <CardDescription>
-          When an incident opens and closes, by type.
-        </CardDescription>
-      </CardHeader>
+      {!hideActions ? (
+        <CardHeader>
+          <CardTitle id={titleId}>Incidents</CardTitle>
+          <CardDescription>
+            When an incident opens and closes, by type.
+          </CardDescription>
+        </CardHeader>
+      ) : null}
       <CardContent className="flex flex-col gap-4">
+        {hideActions ? (
+          <p className="text-xs text-muted-foreground">
+            Changes apply to upcoming runs. Open incidents stay open; Close after
+            uses the next successful runs.
+          </p>
+        ) : null}
         <div
           role="radiogroup"
           aria-label="Incident sensitivity profile"
@@ -303,7 +340,7 @@ export function IncidentPoliciesCard({
           ))}
         </div>
       </CardContent>
-      {!readOnly && (
+      {!readOnly && !hideActions ? (
         <CardFooter className="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
             Changes apply to upcoming runs. Open incidents stay open; Close after
@@ -335,10 +372,10 @@ export function IncidentPoliciesCard({
             </Button>
           </div>
         </CardFooter>
-      )}
+      ) : null}
     </Card>
   )
-}
+})
 
 function PolicyRow({
   row,

@@ -21,7 +21,10 @@ import {
 } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { EmailRecipientsInput } from "@/components/notify-settings/email-recipients-input"
-import { WorkflowSettings } from "@/components/workflow/workflow-settings"
+import {
+  WorkflowSettings,
+  type WorkflowSettingsHandle,
+} from "@/components/workflow/workflow-settings"
 import {
   EXPIRY_MAX_THRESHOLDS,
   EXPIRY_SHORTCUTS,
@@ -43,7 +46,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Loader2Icon, Trash2Icon, XIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 const FIELD_CLASS_NAME = "h-9 bg-background dark:bg-background"
 const SELECT_TRIGGER_CLASS_NAME =
@@ -176,7 +179,6 @@ function WorkflowForm({
 }: WorkflowFormProps) {
   const isCreate = !workflow
   const canEnable = hasCalls || Boolean(workflow?.enabled)
-  const busy = isPending || isDeleting
   const [name, setName] = useState(workflow?.name ?? "")
   const [scheduleType, setScheduleType] = useState<WorkflowScheduleType>(
     workflow?.scheduleType ?? "interval"
@@ -194,6 +196,9 @@ function WorkflowForm({
   const [notificationEmails, setNotificationEmails] = useState<string[]>([])
   const [notificationEmailsTouched, setNotificationEmailsTouched] =
     useState(false)
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  const settingsRef = useRef<WorkflowSettingsHandle>(null)
+  const busy = isPending || isDeleting || settingsSaving
 
   useEffect(() => {
     if (!isCreate || notificationEmailsTouched || !user?.email) return
@@ -209,6 +214,15 @@ function WorkflowForm({
     }
 
     try {
+      if (workflowId) {
+        setSettingsSaving(true)
+        try {
+          await settingsRef.current?.save()
+        } finally {
+          setSettingsSaving(false)
+        }
+      }
+
       await onSubmit({
         name: name.trim(),
         scheduleType,
@@ -231,7 +245,7 @@ function WorkflowForm({
           : {}),
       })
     } catch {
-      // Displayed through the mutation error.
+      // Displayed through the mutation / section errors.
     }
   }
 
@@ -512,20 +526,7 @@ function WorkflowForm({
         ) : null}
 
         {workflowId ? (
-          <>
-            <Separator className="my-10" />
-            <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
-              <div className="space-y-1">
-                <h2 className="font-semibold">Settings</h2>
-                <p className="text-sm text-muted-foreground">
-                  Incident policies, notifications, and certificate expiry.
-                </p>
-              </div>
-              <div className="flex flex-col gap-4 md:col-span-2">
-                <WorkflowSettings workflowId={workflowId} />
-              </div>
-            </div>
-          </>
+          <WorkflowSettings ref={settingsRef} workflowId={workflowId} />
         ) : null}
 
         {error ? (
@@ -559,8 +560,8 @@ function WorkflowForm({
               Cancel
             </Button>
             <Button type="submit" className="w-full sm:w-auto" disabled={busy}>
-              {workflow ? "Update" : "Create"}
-              {isPending ? (
+              {workflow ? "Save" : "Create"}
+              {isPending || settingsSaving ? (
                 <Loader2Icon className="size-4 animate-spin" />
               ) : null}
             </Button>
