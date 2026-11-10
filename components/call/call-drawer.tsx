@@ -20,6 +20,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -282,6 +283,7 @@ function CallForm({
   const busy = isPending || isDeleting
 
   const [name, setName] = useState(call?.name ?? "")
+  const [description, setDescription] = useState(call?.description ?? "")
   const [method, setMethod] = useState<CallMethod>(call?.method ?? "GET")
   const [url, setUrl] = useState(call?.url ?? "")
   const [timeoutMs, setTimeoutMs] = useState(String(call?.timeoutMs ?? 30000))
@@ -306,6 +308,7 @@ function CallForm({
     try {
       await onSubmit({
         name: name.trim(),
+        description: description.trim() || undefined,
         method,
         url: url.trim(),
         timeoutMs: Number(timeoutMs),
@@ -346,6 +349,19 @@ function CallForm({
                 onChange={(event) => setName(event.target.value)}
                 maxLength={100}
                 required
+                className={FIELD_CLASS_NAME}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="call-description">Description</Label>
+              <Textarea
+                id="call-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="Optional notes about this call"
                 className={FIELD_CLASS_NAME}
               />
             </div>

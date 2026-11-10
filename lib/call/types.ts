@@ -45,6 +45,7 @@ export interface CallRule {
 
 export interface CallInput {
   name: string
+  description?: string
   method?: CallMethod
   url: string
   headers?: Record<string, string>
@@ -80,6 +81,7 @@ export interface CallRecentRun {
 export interface Call {
   id: string
   name: string
+  description?: string
   method?: CallMethod | string
   url?: string
   position?: number
@@ -94,6 +96,7 @@ export interface Call {
 export interface CallDetail extends Call {
   method: CallMethod
   url: string
+  description: string
   headers: Record<string, string>
   query: Record<string, string>
   body: string
