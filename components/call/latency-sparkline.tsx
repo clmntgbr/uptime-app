@@ -5,6 +5,11 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import type { CallRecentRun } from "@/lib/call/types"
 import { cn } from "@/lib/utils"
 
@@ -54,15 +59,40 @@ function timingRows(run: CallRecentRun) {
     (run.latencyMs ?? 0) - dns - connect - tls - transfer
   )
   return [
-    { key: "dns", label: "Name lookup", swatch: "bg-violet-500", ms: dns },
-    { key: "connect", label: "Connection", swatch: "bg-blue-500", ms: connect },
-    { key: "tls", label: "TLS handshake", swatch: "bg-teal-400", ms: tls },
-    { key: "waiting", label: "Waiting", swatch: "bg-amber-400", ms: waiting },
+    {
+      key: "dns",
+      label: "Name lookup",
+      swatch: "bg-violet-500",
+      ms: dns,
+      hint: "Time to resolve the hostname to an IP address (DNS lookup).",
+    },
+    {
+      key: "connect",
+      label: "Connection",
+      swatch: "bg-blue-500",
+      ms: connect,
+      hint: "Time to open the TCP connection to the server.",
+    },
+    {
+      key: "tls",
+      label: "TLS handshake",
+      swatch: "bg-teal-400",
+      ms: tls,
+      hint: "Time to negotiate the secure HTTPS session (TLS handshake).",
+    },
+    {
+      key: "waiting",
+      label: "Waiting",
+      swatch: "bg-amber-400",
+      ms: waiting,
+      hint: "Time spent waiting for the server after the connection is ready — until the first response byte (TTFB minus DNS, TCP, and TLS).",
+    },
     {
       key: "transfer",
       label: "Data transfer",
       swatch: "bg-emerald-500",
       ms: transfer,
+      hint: "Time to download the response body after the first byte arrives.",
     },
   ]
 }
@@ -163,7 +193,19 @@ export function LatencySparkline({
                               phase.swatch
                             )}
                           />
-                          <span className="min-w-0 flex-1">{phase.label}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="min-w-0 flex-1 cursor-help underline decoration-dotted decoration-muted-foreground/60 underline-offset-2">
+                                {phase.label}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="left"
+                              className="max-w-56 text-xs"
+                            >
+                              {phase.hint}
+                            </TooltipContent>
+                          </Tooltip>
                           <span className="tabular-nums text-muted-foreground">
                             {formatTimingMs(phase.ms)}
                           </span>

@@ -23,25 +23,25 @@ function highlightJsonSegment(segment: string): string {
     (match, quoted, keySuffix, primitive) => {
       if (quoted !== undefined) {
         if (keySuffix) {
-          return `<span class="text-red-400">${quoted}</span>${keySuffix}`
+          return `<span class="text-red-600 dark:text-red-400">${quoted}</span>${keySuffix}`
         }
-        return `<span class="text-emerald-400">${quoted}</span>`
+        return `<span class="text-emerald-700 dark:text-emerald-400">${quoted}</span>`
       }
       if (primitive === "true" || primitive === "false") {
-        return `<span class="text-amber-400">${match}</span>`
+        return `<span class="text-amber-700 dark:text-amber-400">${match}</span>`
       }
       if (primitive === "null") {
-        return `<span class="text-rose-400">${match}</span>`
+        return `<span class="text-rose-700 dark:text-rose-400">${match}</span>`
       }
-      return `<span class="text-sky-300">${match}</span>`
+      return `<span class="text-sky-700 dark:text-sky-300">${match}</span>`
     }
   )
 }
 
 function highlightJsonText(text: string): string {
   const escaped = escapeHtml(text)
-  // Dark editor: sky-400 matches call-list variable emphasis on dark bg.
-  const variableClass = "font-semibold text-sky-400"
+  const variableClass =
+    "font-semibold text-sky-600 dark:text-sky-400"
   return escaped
     .split(/(\{\{[^}]+\}\})/g)
     .map((part) =>
@@ -130,16 +130,16 @@ export function JsonBodyInput({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-xl border border-slate-700 bg-slate-900 text-sm shadow-none",
+        "overflow-hidden rounded-xl border bg-background text-sm shadow-none",
         className
       )}
     >
-      <div className="flex items-center justify-between border-b border-slate-700 bg-slate-800 px-4 py-2.5">
+      <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-2.5">
         <div className="flex items-center gap-2">
           <div className="size-3 rounded-full bg-rose-500" />
           <div className="size-3 rounded-full bg-amber-500" />
           <div className="size-3 rounded-full bg-emerald-500" />
-          <span className="ml-3 text-xs text-slate-400">{title}</span>
+          <span className="ml-3 text-xs text-muted-foreground">{title}</span>
         </div>
         <div className="flex items-center gap-1">
           <Button
@@ -147,7 +147,7 @@ export function JsonBodyInput({
             variant="ghost"
             size="icon"
             onClick={handleCollapse}
-            className="text-white hover:bg-slate-700 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
             aria-label="Collapse JSON"
           >
             <ListChevronsDownUpIcon className="size-3" />
@@ -157,7 +157,7 @@ export function JsonBodyInput({
             variant="ghost"
             size="icon"
             onClick={handleExpand}
-            className="text-white hover:bg-slate-700 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
             aria-label="Expand JSON"
           >
             <ListChevronsUpDownIcon className="size-3" />
@@ -167,7 +167,7 @@ export function JsonBodyInput({
             variant="ghost"
             size="icon"
             onClick={handleFormat}
-            className="text-white hover:bg-slate-700 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
             aria-label="Format JSON"
           >
             <WandSparklesIcon className="size-3" />
@@ -176,17 +176,17 @@ export function JsonBodyInput({
       </div>
 
       {error && (
-        <div className="flex items-start gap-3 border-b border-rose-800/50 bg-rose-950/50 px-4 py-3 text-xs text-rose-400">
+        <div className="flex items-start gap-3 border-b border-destructive/30 bg-destructive/10 px-4 py-3 text-xs text-destructive">
           <AlertTriangleIcon className="mt-0.5 size-3.5 shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="relative">
+      <div className="relative bg-background">
         <pre
           ref={highlightedRef}
           aria-hidden
-          className="pointer-events-none absolute inset-0 overflow-auto px-4 py-3 font-mono text-sm leading-6 wrap-break-word whitespace-pre-wrap text-slate-300"
+          className="pointer-events-none absolute inset-0 overflow-auto px-4 py-3 font-mono text-sm leading-6 wrap-break-word whitespace-pre-wrap text-foreground"
           dangerouslySetInnerHTML={{
             __html: highlightJsonText(value) || " ",
           }}
@@ -199,7 +199,7 @@ export function JsonBodyInput({
           spellCheck={false}
           placeholder='{"key":"value"}'
           className={cn(
-            "relative w-full resize-y overflow-auto bg-transparent px-4 py-3 font-mono text-sm leading-6 text-transparent caret-slate-100 outline-none placeholder:text-slate-500",
+            "relative w-full resize-y overflow-auto bg-transparent px-4 py-3 font-mono text-sm leading-6 text-transparent caret-foreground outline-none placeholder:text-muted-foreground",
             editorClassName ?? "min-h-40"
           )}
         />

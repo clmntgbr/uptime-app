@@ -22,6 +22,7 @@ interface KeyValueEditorProps {
   variables: AvailableVariable[]
   workflowId?: string
   keySuggestionKind?: CallSuggestionKind
+  valueSuggestionKind?: CallSuggestionKind
   keyPlaceholder?: string
   valuePlaceholder?: string
   addLabel?: string
@@ -52,6 +53,7 @@ export function KeyValueEditor({
   variables,
   workflowId,
   keySuggestionKind,
+  valueSuggestionKind,
   keyPlaceholder = "Key",
   valuePlaceholder = "Value",
   addLabel = "Add entry",
@@ -97,13 +99,25 @@ export function KeyValueEditor({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <VariableInput
-                value={pair.value}
-                onChange={(value) => updatePair(index, { value })}
-                variables={variables}
-                placeholder={valuePlaceholder}
-                className="h-9 bg-background dark:bg-background"
-              />
+              {workflowId && valueSuggestionKind ? (
+                <SuggestibleInput
+                  workflowId={workflowId}
+                  kind={valueSuggestionKind}
+                  value={pair.value}
+                  onChange={(value) => updatePair(index, { value })}
+                  variables={variables}
+                  placeholder={valuePlaceholder}
+                  className="h-9 bg-background dark:bg-background"
+                />
+              ) : (
+                <VariableInput
+                  value={pair.value}
+                  onChange={(value) => updatePair(index, { value })}
+                  variables={variables}
+                  placeholder={valuePlaceholder}
+                  className="h-9 bg-background dark:bg-background"
+                />
+              )}
             </div>
             <Button
               type="button"

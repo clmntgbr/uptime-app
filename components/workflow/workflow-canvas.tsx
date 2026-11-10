@@ -561,9 +561,9 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
           }}
         />
         {/* Pan via relative left/top — no CSS transform/zoom on the DnD tree. */}
-        <div className="flex h-full w-full items-center justify-center">
+        <div className="flex h-full w-full justify-center">
           <div
-            className="relative z-10 px-6 py-8"
+            className="relative z-10 px-6 pt-10 pb-8"
             style={{ left: pan.x, top: pan.y }}
           >
             {callsQuery.isLoading ? (

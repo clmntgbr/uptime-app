@@ -409,6 +409,7 @@ function CallForm({
               variables={variables}
               workflowId={workflowId}
               keySuggestionKind="header-keys"
+              valueSuggestionKind="header-values"
               keyPlaceholder="Header"
               valuePlaceholder="Value"
               addLabel="Add header"
@@ -422,6 +423,7 @@ function CallForm({
               variables={variables}
               workflowId={workflowId}
               keySuggestionKind="query-keys"
+              valueSuggestionKind="query-values"
               keyPlaceholder="Param"
               valuePlaceholder="Value"
               addLabel="Add query"
