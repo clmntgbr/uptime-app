@@ -14,6 +14,17 @@ export interface RunDayCounts {
   running: number
 }
 
+/** One UTC hour of run aggregates (RFC3339 hour start). */
+export interface RunHourCounts {
+  hour: string
+  total: number
+  success: number
+  failed: number
+  error: number
+  skipped: number
+  running: number
+}
+
 export interface RunCounts {
   total: number
   success: number
@@ -22,6 +33,7 @@ export interface RunCounts {
   skipped: number
   running: number
   daily: RunDayCounts[]
+  hourly: RunHourCounts[]
 }
 
 export interface CallDayCounts {
@@ -65,7 +77,7 @@ export interface IncidentRange {
   end: string | null
 }
 
-/** GET /api/statistics — 24h counters + runs/calls daily (~6 months UTC). */
+/** GET /api/statistics — 24h counters + runs hourly + runs/calls daily (~6 months UTC). */
 export interface DashboardStats {
   windowHours: number
   workflows: WorkflowCounts

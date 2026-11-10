@@ -27,6 +27,7 @@ import type {
   CallDurationSeries,
   IncidentRange,
   RunDayCounts,
+  RunHourCounts,
 } from "@/lib/stats/types"
 import { cn } from "@/lib/utils"
 
@@ -40,7 +41,7 @@ const RANGES = [
   { id: "day", label: "Day" },
   { id: "week", label: "Week" },
   { id: "month", label: "Month" },
-  { id: "6m", label: "6 months" },
+  { id: "1m", label: "Last month" },
 ] as const
 
 type TimeRange = (typeof RANGES)[number]["id"]
@@ -89,6 +90,14 @@ function formatMonth(date: string) {
   })
 }
 
+function formatHour(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    hour12: false,
+    timeZone: "UTC",
+  })
+}
+
 function overlapsIncident(
   start: string,
   end: string,
@@ -101,26 +110,65 @@ function overlapsIncident(
   })
 }
 
-function windowDays(range: TimeRange, dates: string[]): string[] {
+function overlapsIncidentHour(hourIso: string, incidents: IncidentRange[]) {
+  const hourStart = new Date(hourIso).getTime()
+  if (Number.isNaN(hourStart)) return overlapsIncident(utcDay(hourIso), utcDay(hourIso), incidents)
+  const hourEnd = hourStart + 60 * 60 * 1000
+  return incidents.some((incident) => {
+    const incidentStart = new Date(incident.start).getTime()
+    if (Number.isNaN(incidentStart)) return false
+    const incidentEnd = incident.end
+      ? new Date(incident.end).getTime()
+      : Number.POSITIVE_INFINITY
+    if (Number.isNaN(incidentEnd)) return false
+    return incidentStart < hourEnd && incidentEnd >= hourStart
+  })
+}
+
+/** Day windows for daily-bucketed ranges (not Hour). */
+function windowDays(range: Exclude<TimeRange, "hour">, dates: string[]): string[] {
   const end = dates.at(-1)
   if (!end) return []
   const dayWindow =
-    range === "hour" ? 1 : range === "day" ? 30 : range === "week" ? 84 : 183
+    range === "day" ? 7 : range === "week" ? 84 : range === "1m" ? 30 : 183
   const start = shiftUtcDate(end, -(dayWindow - 1))
   return dates.filter((date) => date >= start && date <= end)
+}
+
+function buildHourlyBuckets(
+  runsHourly: RunHourCounts[],
+  incidents: IncidentRange[]
+): Bucket[] {
+  return runsHourly.map((hour) => {
+    const day = utcDay(hour.hour)
+    return {
+      key: hour.hour,
+      label: formatHour(hour.hour),
+      start: day,
+      end: day,
+      success: hour.success ?? 0,
+      failed: (hour.failed ?? 0) + (hour.error ?? 0),
+      incident: overlapsIncidentHour(hour.hour, incidents),
+    }
+  })
 }
 
 function buildBuckets(
   range: TimeRange,
   runsDaily: RunDayCounts[],
+  runsHourly: RunHourCounts[],
   dates: string[],
   incidents: IncidentRange[]
 ): Bucket[] {
+  if (range === "hour") {
+    return buildHourlyBuckets(runsHourly, incidents)
+  }
+
   const runsByDate = new Map(runsDaily.map((day) => [day.date, day]))
   const days = windowDays(range, dates)
   if (days.length === 0) return []
 
-  if (range === "hour" || range === "day" || range === "6m") {
+  if (range === "day" || range === "1m") {
     return days.map((date) => {
       const run = runsByDate.get(date)
       return {
@@ -204,14 +252,14 @@ type DurationCall = {
   color: string
 }
 
-function bucketKeyFor(range: TimeRange, date: string) {
+function bucketKeyFor(range: Exclude<TimeRange, "hour">, date: string) {
   if (range === "week") return weekStart(date)
   if (range === "month") return date.slice(0, 7)
   return date
 }
 
 function buildDuration(
-  range: TimeRange,
+  range: Exclude<TimeRange, "hour">,
   series: CallDurationSeries[],
   dates: string[],
   incidents: IncidentRange[]
@@ -294,9 +342,11 @@ function buildDuration(
 function TimeRangeToggle({
   value,
   onChange,
+  ranges = RANGES,
 }: {
   value: TimeRange
   onChange: (value: TimeRange) => void
+  ranges?: readonly { id: TimeRange; label: string }[]
 }) {
   return (
     <div
@@ -304,7 +354,7 @@ function TimeRangeToggle({
       role="group"
       aria-label="Time range"
     >
-      {RANGES.map((range) => (
+      {ranges.map((range) => (
         <button
           key={range.id}
           type="button"
@@ -322,17 +372,22 @@ function TimeRangeToggle({
   )
 }
 
+const DURATION_RANGES = RANGES.filter((range) => range.id !== "hour")
+
 export function StatsAreaChart({
   runsDaily,
+  runsHourly = [],
   callDurations = [],
   incidents = [],
 }: {
   runsDaily: RunDayCounts[]
+  runsHourly?: RunHourCounts[]
   callDurations?: CallDurationSeries[]
   incidents?: IncidentRange[]
 }) {
-  const [runsRange, setRunsRange] = React.useState<TimeRange>("day")
-  const [durationRange, setDurationRange] = React.useState<TimeRange>("day")
+  const [runsRange, setRunsRange] = React.useState<TimeRange>("1m")
+  const [durationRange, setDurationRange] =
+    React.useState<Exclude<TimeRange, "hour">>("1m")
   const dates = React.useMemo(() => {
     const keys = new Set(runsDaily.map((day) => day.date))
     for (const call of callDurations) {
@@ -341,8 +396,8 @@ export function StatsAreaChart({
     return Array.from(keys).sort()
   }, [runsDaily, callDurations])
   const buckets = React.useMemo(
-    () => buildBuckets(runsRange, runsDaily, dates, incidents),
-    [runsRange, runsDaily, dates, incidents]
+    () => buildBuckets(runsRange, runsDaily, runsHourly, dates, incidents),
+    [runsRange, runsDaily, runsHourly, dates, incidents]
   )
   const duration = React.useMemo(
     () => buildDuration(durationRange, callDurations, dates, incidents),
@@ -416,7 +471,10 @@ export function StatsAreaChart({
             <CardTitle>Duration</CardTitle>
             <TimeRangeToggle
               value={durationRange}
-              onChange={setDurationRange}
+              onChange={(value) => {
+                if (value !== "hour") setDurationRange(value)
+              }}
+              ranges={DURATION_RANGES}
             />
           </CardHeader>
           <CardContent className="px-2 pt-4 sm:px-4">

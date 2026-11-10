@@ -178,6 +178,7 @@ export function DashboardCharts({ workflowId }: { workflowId?: string } = {}) {
   return (
     <StatsAreaChart
       runsDaily={statsQuery.data.runs.daily ?? []}
+      runsHourly={statsQuery.data.runs.hourly ?? []}
       callDurations={statsQuery.data.callDurations ?? []}
       incidents={statsQuery.data.incidents ?? []}
     />
@@ -243,6 +244,7 @@ export function DashboardStats({
       {showCharts ? (
         <StatsAreaChart
           runsDaily={runs.daily ?? []}
+          runsHourly={runs.hourly ?? []}
           callDurations={statsQuery.data.callDurations ?? []}
           incidents={statsQuery.data.incidents ?? []}
         />
