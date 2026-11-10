@@ -163,6 +163,7 @@ function StaticVariableForm({
         <Label htmlFor="static-variable-name">Name</Label>
         <Input
           id="static-variable-name"
+          className="h-9 bg-background dark:bg-background"
           value={name}
           onChange={(event) => {
             setName(event.target.value)
@@ -184,6 +185,7 @@ function StaticVariableForm({
         <Label htmlFor="static-variable-value">Value</Label>
         <Input
           id="static-variable-value"
+          className="h-9 bg-background dark:bg-background"
           type={secret ? "password" : "text"}
           value={value}
           onChange={(event) => setValue(event.target.value)}

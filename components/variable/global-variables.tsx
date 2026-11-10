@@ -255,6 +255,7 @@ function GlobalVariableForm({
         <Label htmlFor="global-variable-name">Name</Label>
         <Input
           id="global-variable-name"
+          className="h-9 bg-background dark:bg-background"
           value={name}
           onChange={(event) => {
             setName(event.target.value)
@@ -276,6 +277,7 @@ function GlobalVariableForm({
         <Label htmlFor="global-variable-value">Value</Label>
         <Input
           id="global-variable-value"
+          className="h-9 bg-background dark:bg-background"
           type={secret ? "password" : "text"}
           value={value}
           onChange={(event) => setValue(event.target.value)}

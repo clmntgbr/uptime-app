@@ -481,6 +481,7 @@ function CallVariableForm({
         <Label htmlFor="call-variable-name">Name</Label>
         <Input
           id="call-variable-name"
+          className="h-9 bg-background dark:bg-background"
           value={name}
           onChange={(event) => {
             setName(event.target.value)
@@ -526,6 +527,7 @@ function CallVariableForm({
           <div className="relative">
             <Input
               id="call-variable-path"
+              className="h-9 bg-background dark:bg-background"
               value={path}
               onChange={(event) => setPath(event.target.value)}
               onFocus={() => setPathFocused(true)}
