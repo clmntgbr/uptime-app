@@ -18,6 +18,7 @@ import {
 import { IncidentDetailDrawer } from "@/components/incident/incident-detail-drawer"
 import { IncidentRow } from "@/components/incident/incident-row"
 import { IncidentsListDrawer } from "@/components/incident/incidents-list-drawer"
+import { LatestRunCard } from "@/components/workflow/latest-run-card"
 import { ApiError } from "@/lib/api-error"
 import { useCalls } from "@/lib/call/hooks"
 import {
@@ -50,11 +51,8 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
 
   const members = incidentsQuery.data?.members ?? []
   const total = incidentsQuery.data?.total ?? members.length
-
-  if (incidentsQuery.isLoading || incidentsQuery.isError) {
-    return null
-  }
-
+  const incidentsReady =
+    !incidentsQuery.isLoading && !incidentsQuery.isError
   const preview = members.slice(0, PREVIEW_LIMIT)
   const hasMore = total > PREVIEW_LIMIT
   const isEmpty = members.length === 0
@@ -86,60 +84,65 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card size="sm" className="md:col-span-1">
-          <CardHeader className="pb-0">
-            <CardTitle>Incidents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isEmpty ? (
-              <Empty className="border-0 p-4 md:p-6">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <CheckCircle2Icon />
-                  </EmptyMedia>
-                  <EmptyTitle>No active incidents</EmptyTitle>
-                  <EmptyDescription>
-                    This workflow is healthy right now.
-                  </EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              <ul className="flex flex-col">
-                {preview.map((incident) => (
-                  <IncidentRow
-                    key={incident.id}
-                    incident={incident}
-                    callName={
-                      incident.callId
-                        ? callNameById.get(incident.callId)
-                        : undefined
-                    }
-                    acknowledging={
-                      acknowledgeMutation.isPending &&
-                      acknowledgeMutation.variables === incident.id
-                    }
-                    onOpen={() => openDetail(incident.id)}
-                    onAcknowledge={handleAcknowledge}
-                  />
-                ))}
-              </ul>
-            )}
-          </CardContent>
-          {hasMore ? (
-            <CardFooter className="border-t pt-3">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="px-0"
-                onClick={() => setListOpen(true)}
-              >
-                See all ({total})
-              </Button>
-            </CardFooter>
-          ) : null}
-        </Card>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {incidentsReady ? (
+          <Card size="sm" className="md:col-span-1">
+            <CardHeader className="pb-0">
+              <CardTitle>Incidents</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {isEmpty ? (
+                <Empty className="border-0 p-4 md:p-6">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <CheckCircle2Icon />
+                    </EmptyMedia>
+                    <EmptyTitle>No active incidents</EmptyTitle>
+                    <EmptyDescription>
+                      This workflow is healthy right now.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <ul className="flex flex-col">
+                  {preview.map((incident) => (
+                    <IncidentRow
+                      key={incident.id}
+                      incident={incident}
+                      callName={
+                        incident.callId
+                          ? callNameById.get(incident.callId)
+                          : undefined
+                      }
+                      acknowledging={
+                        acknowledgeMutation.isPending &&
+                        acknowledgeMutation.variables === incident.id
+                      }
+                      onOpen={() => openDetail(incident.id)}
+                      onAcknowledge={handleAcknowledge}
+                    />
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+            {hasMore ? (
+              <CardFooter className="border-t pt-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="px-0"
+                  onClick={() => setListOpen(true)}
+                >
+                  See all ({total})
+                </Button>
+              </CardFooter>
+            ) : null}
+          </Card>
+        ) : null}
+        <div className="md:col-span-1">
+          <LatestRunCard workflowId={workflowId} />
+        </div>
       </div>
 
       <IncidentsListDrawer

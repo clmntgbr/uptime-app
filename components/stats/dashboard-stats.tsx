@@ -3,8 +3,8 @@
 import { CircleHelpIcon } from "lucide-react"
 import type { ReactNode } from "react"
 
+import { RunStatusBadge } from "@/components/run/run-status-badge"
 import { StatsAreaChart } from "@/components/stats/stats-area-chart"
-import { Badge } from "@/components/ui/badge"
 import {
   Card,
   CardAction,
@@ -55,14 +55,12 @@ function StatCard({
   description,
   value,
   badge = null,
-  badgeClassName,
   footerTitle = null,
   footerHint = null,
 }: {
   description: ReactNode
   value: ReactNode
-  badge?: string | null
-  badgeClassName?: string
+  badge?: ReactNode
   footerTitle?: string | null
   footerHint?: string | null
 }) {
@@ -75,13 +73,7 @@ function StatCard({
         <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
           {value}
         </CardTitle>
-        {badge != null && (
-          <CardAction>
-            <Badge variant="outline" className={badgeClassName}>
-              {badge}
-            </Badge>
-          </CardAction>
-        )}
+        {badge != null && <CardAction>{badge}</CardAction>}
       </CardHeader>
       {showFooter && (
         <CardFooter className="flex-col items-start gap-1.5 text-sm">
@@ -95,24 +87,6 @@ function StatCard({
       )}
     </Card>
   )
-}
-
-/** Soft status tint — muted fills, never flashy solids. */
-function lastRunBadgeClass(status: string | undefined) {
-  switch (status) {
-    case "success":
-      return "border-transparent bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-    case "failed":
-      return "border-transparent bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300"
-    case "error":
-      return "border-transparent bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300"
-    case "running":
-      return "border-transparent bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-300"
-    case "skipped":
-      return "border-transparent bg-muted text-muted-foreground"
-    default:
-      return undefined
-  }
 }
 
 function countWithFailures(
@@ -157,13 +131,10 @@ function LastRunStatCard({
             : "—"
       }
       badge={
-        isRunning
-          ? null
-          : resolvedStatus
-            ? formatRunStatusLabel(resolvedStatus)
-            : null
+        isRunning || !resolvedStatus ? null : (
+          <RunStatusBadge status={resolvedStatus} />
+        )
       }
-      badgeClassName={lastRunBadgeClass(resolvedStatus)}
     />
   )
 }

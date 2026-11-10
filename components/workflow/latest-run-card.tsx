@@ -2,14 +2,9 @@
 
 import { CallDrawer } from "@/components/call/call-drawer"
 import { RunDrawer } from "@/components/run/run-drawer"
+import { RunStatusBadge } from "@/components/run/run-status-badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -19,13 +14,10 @@ import {
 import { cascadeBarStyle } from "@/lib/context/cascade"
 import { useContextLatestRun } from "@/lib/context/hooks"
 import type { ContextCall } from "@/lib/context/types"
-import {
-  formatLatencyMs,
-  formatRunStatusLabel,
-} from "@/lib/stats/format"
+import { formatLatencyMs, formatRunStatusLabel } from "@/lib/stats/format"
 import { useRelativeTime } from "@/lib/stats/hooks"
-import { useRunWorkflow } from "@/lib/workflow/hooks"
 import { cn } from "@/lib/utils"
+import { useRunWorkflow } from "@/lib/workflow/hooks"
 import { useId, useState } from "react"
 
 function callBarClass(status: string) {
@@ -45,12 +37,16 @@ function CallCascadeRow({
 }) {
   const bar = cascadeBarStyle(call.offsetMs, call.durationMs, runDurationMs)
   const statusLabel = formatRunStatusLabel(call.status)
+  const rightLabel =
+    call.status === "skipped" ? "skipped" : formatLatencyMs(call.durationMs)
   const content = (
     <>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate font-medium text-foreground">{call.name}</span>
-        <span className="shrink-0 tabular-nums text-muted-foreground">
-          {formatLatencyMs(call.durationMs)}
+        <span className="truncate font-medium text-foreground">
+          {call.name}
+        </span>
+        <span className="shrink-0 text-muted-foreground tabular-nums">
+          {rightLabel}
         </span>
       </div>
       <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
@@ -124,19 +120,27 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
   }
 
   return (
-    <Card
-      size="sm"
-      className="bg-card"
-      role="region"
-      aria-labelledby={titleId}
-    >
+    <Card size="sm" className="bg-card" role="region" aria-labelledby={titleId}>
       <CardHeader className="border-b">
-        <CardTitle id={titleId}>Last run</CardTitle>
-        {query.data?.run ? (
-          <p className="text-muted-foreground">
-            {formatLatencyMs(query.data.run.durationMs)} · {relative}
-          </p>
-        ) : null}
+        <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2">
+          <CardTitle id={titleId} className="justify-self-start">
+            Last run
+          </CardTitle>
+          {query.data?.run ? (
+            <p className="text-center text-muted-foreground tabular-nums">
+              {formatLatencyMs(query.data.run.durationMs)}
+            </p>
+          ) : (
+            <span />
+          )}
+          {query.data?.run ? (
+            <div className="justify-self-end">
+              <RunStatusBadge status={query.data.run.status} />
+            </div>
+          ) : (
+            <span />
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {query.isLoading ? (
@@ -187,19 +191,6 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
           </ul>
         )}
       </CardContent>
-      {query.data?.run ? (
-        <CardFooter className="border-t">
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-auto px-0"
-            onClick={() => openRun(query.data!.run!.id)}
-          >
-            View run details
-          </Button>
-        </CardFooter>
-      ) : null}
 
       <RunDrawer
         workflowId={workflowId}
