@@ -1,10 +1,22 @@
 "use client"
 
 import { CallDrawer } from "@/components/call/call-drawer"
-import { RunDrawer } from "@/components/run/run-drawer"
 import { RunStatusBadge } from "@/components/run/run-status-badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
   Tooltip,
@@ -15,10 +27,11 @@ import { cascadeBarStyle } from "@/lib/context/cascade"
 import { useContextLatestRun } from "@/lib/context/hooks"
 import type { ContextCall } from "@/lib/context/types"
 import { formatLatencyMs, formatRunStatusLabel } from "@/lib/stats/format"
-import { useRelativeTime } from "@/lib/stats/hooks"
 import { cn } from "@/lib/utils"
 import { useRunWorkflow } from "@/lib/workflow/hooks"
-import { useId, useState } from "react"
+import { useId, useMemo, useState } from "react"
+
+const PREVIEW_LIMIT = 5
 
 function callBarClass(status: string) {
   if (status === "success") return "bg-emerald-500"
@@ -99,43 +112,74 @@ function CallCascadeRow({
   )
 }
 
+function CallCascadeList({
+  calls,
+  runDurationMs,
+  onOpenCall,
+}: {
+  calls: ContextCall[]
+  runDurationMs: number
+  onOpenCall: (callId: string) => void
+}) {
+  return (
+    <ul className="flex flex-col gap-1">
+      {calls.map((call) => (
+        <li key={`${call.position}-${call.callId ?? call.name}`}>
+          <CallCascadeRow
+            call={call}
+            runDurationMs={runDurationMs}
+            onOpen={call.callId ? () => onOpenCall(call.callId!) : undefined}
+          />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 export function LatestRunCard({ workflowId }: { workflowId: string }) {
   const titleId = useId()
   const query = useContextLatestRun(workflowId)
   const runMutation = useRunWorkflow()
-  const [runDrawerOpen, setRunDrawerOpen] = useState(false)
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(null)
   const [callDrawerOpen, setCallDrawerOpen] = useState(false)
   const [selectedCallId, setSelectedCallId] = useState<string | null>(null)
-  const relative = useRelativeTime(query.data?.run?.startedAt)
-
-  const openRun = (runId: string) => {
-    setSelectedRunId(runId)
-    setRunDrawerOpen(true)
-  }
+  const [allCallsOpen, setAllCallsOpen] = useState(false)
 
   const openCall = (callId: string) => {
     setSelectedCallId(callId)
     setCallDrawerOpen(true)
   }
 
+  const orderedCalls = useMemo(() => {
+    const calls = query.data?.run?.calls ?? []
+    return [...calls].sort((a, b) => a.position - b.position)
+  }, [query.data?.run?.calls])
+
+  const previewCalls = orderedCalls.slice(0, PREVIEW_LIMIT)
+  const hasMore = orderedCalls.length > PREVIEW_LIMIT
+  const run = query.data?.run
+
   return (
-    <Card size="sm" className="bg-card" role="region" aria-labelledby={titleId}>
+    <Card
+      size="sm"
+      className="h-full bg-card"
+      role="region"
+      aria-labelledby={titleId}
+    >
       <CardHeader className="border-b">
         <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2">
           <CardTitle id={titleId} className="justify-self-start">
             Last run
           </CardTitle>
-          {query.data?.run ? (
+          {run ? (
             <p className="text-center text-muted-foreground tabular-nums">
-              {formatLatencyMs(query.data.run.durationMs)}
+              {formatLatencyMs(run.durationMs)}
             </p>
           ) : (
             <span />
           )}
-          {query.data?.run ? (
+          {run ? (
             <div className="justify-self-end">
-              <RunStatusBadge status={query.data.run.status} />
+              <RunStatusBadge status={run.status} />
             </div>
           ) : (
             <span />
@@ -161,7 +205,7 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
               Retry
             </Button>
           </div>
-        ) : !query.data?.run ? (
+        ) : !run ? (
           <div className="flex flex-col items-start gap-3">
             <p className="text-muted-foreground">No runs yet</p>
             <Button
@@ -174,30 +218,50 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
             </Button>
           </div>
         ) : (
-          <ul className="flex flex-col gap-1">
-            {[...query.data.run.calls]
-              .sort((a, b) => a.position - b.position)
-              .map((call) => (
-                <li key={`${call.position}-${call.callId ?? call.name}`}>
-                  <CallCascadeRow
-                    call={call}
-                    runDurationMs={query.data!.run!.durationMs}
-                    onOpen={
-                      call.callId ? () => openCall(call.callId!) : undefined
-                    }
-                  />
-                </li>
-              ))}
-          </ul>
+          <CallCascadeList
+            calls={previewCalls}
+            runDurationMs={run.durationMs}
+            onOpenCall={openCall}
+          />
         )}
       </CardContent>
+      {run && hasMore ? (
+        <CardFooter className="border-t pt-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="px-0"
+            onClick={() => setAllCallsOpen(true)}
+          >
+            See all ({orderedCalls.length})
+          </Button>
+        </CardFooter>
+      ) : null}
 
-      <RunDrawer
-        workflowId={workflowId}
-        runId={selectedRunId}
-        open={runDrawerOpen}
-        onOpenChange={setRunDrawerOpen}
-      />
+      <Dialog open={allCallsOpen} onOpenChange={setAllCallsOpen}>
+        <DialogContent className="max-h-[min(80vh,40rem)] overflow-y-auto sm:max-w-md data-open:zoom-in-90 data-closed:zoom-out-95">
+          <DialogHeader>
+            <div className="flex items-center justify-between gap-2 pe-8">
+              <DialogTitle>Last run calls</DialogTitle>
+              {run ? <RunStatusBadge status={run.status} /> : null}
+            </div>
+            <DialogDescription>
+              {run
+                ? `${orderedCalls.length} calls · ${formatLatencyMs(run.durationMs)}`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          {run ? (
+            <CallCascadeList
+              calls={orderedCalls}
+              runDurationMs={run.durationMs}
+              onOpenCall={openCall}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <CallDrawer
         workflowId={workflowId}
         callId={selectedCallId}

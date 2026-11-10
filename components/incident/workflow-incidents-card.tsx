@@ -26,6 +26,7 @@ import {
   useActiveIncidents,
 } from "@/lib/incident/hooks"
 import { SHEET_CLOSE_MS } from "@/components/ui/sheet"
+import { cn } from "@/lib/utils"
 import { CheckCircle2Icon } from "lucide-react"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
@@ -86,11 +87,13 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {incidentsReady ? (
-          <Card size="sm" className="md:col-span-1">
+          <Card size="sm" className="h-full md:col-span-1">
             <CardHeader className="pb-0">
               <CardTitle>Incidents</CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent
+              className={cn(isEmpty && "flex flex-1 items-center justify-center")}
+            >
               {isEmpty ? (
                 <Empty className="border-0 p-4 md:p-6">
                   <EmptyHeader>
@@ -140,7 +143,7 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
             ) : null}
           </Card>
         ) : null}
-        <div className="md:col-span-1">
+        <div className="h-full md:col-span-1">
           <LatestRunCard workflowId={workflowId} />
         </div>
       </div>
