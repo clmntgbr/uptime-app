@@ -91,11 +91,12 @@ function formatMonth(date: string) {
 }
 
 function formatHour(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-US", {
+  const hour = new Date(iso).toLocaleTimeString("en-US", {
     hour: "numeric",
     hour12: false,
     timeZone: "UTC",
   })
+  return `${hour}h`
 }
 
 function overlapsIncident(
