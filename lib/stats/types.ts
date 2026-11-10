@@ -63,12 +63,20 @@ export interface CallDurationPoint {
   samples: number
 }
 
-/** One call's mean duration over the history window. Stacking a day rebuilds the average run. */
+/** Mean timings.total for one call in one UTC hour (RFC3339 hour start). */
+export interface CallDurationHourPoint {
+  hour: string
+  durationMs: number
+  samples: number
+}
+
+/** One call's mean duration over the history window. Stacking a bucket rebuilds the average run. */
 export interface CallDurationSeries {
   id: string
   name: string
   position: number
   daily: CallDurationPoint[]
+  hourly: CallDurationHourPoint[]
 }
 
 /** Contiguous failed/error run range. `end` is null while the incident is still open. */

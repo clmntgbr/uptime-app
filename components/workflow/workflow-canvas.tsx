@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { VariableText } from "@/components/variable/variable-text"
 import {
   useCalls,
@@ -567,9 +568,19 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
             style={{ left: pan.x, top: pan.y }}
           >
             {callsQuery.isLoading ? (
-              <p className="text-center text-sm text-muted-foreground">
-                Loading…
-              </p>
+              <div className="flex flex-col items-center gap-8">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="flex flex-col items-center gap-8">
+                    <Skeleton
+                      className="rounded-2xl"
+                      style={{ width: BASE_CARD_WIDTH, height: 88 }}
+                    />
+                    {index < 2 ? (
+                      <Skeleton className="h-8 w-0.5 rounded-full" />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
             ) : callsQuery.error ? (
               <p className="text-center text-sm text-destructive">
                 {callsQuery.error.message}

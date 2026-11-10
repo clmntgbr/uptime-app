@@ -3,6 +3,7 @@
 import { WorkflowIncidentsCard } from "@/components/incident/workflow-incidents-card"
 import { RunList } from "@/components/run/run-list"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { WorkflowCharts } from "@/components/workflow/workflow-charts"
@@ -104,7 +105,36 @@ export default function WorkflowPage() {
   const updateMutation = useUpdateWorkflow()
 
   if (workflowQuery.isLoading) {
-    return <p className="text-muted-foreground">Loading…</p>
+    return (
+      <div className="flex flex-col gap-0">
+        <div className="sticky top-16 z-10 -mx-4 border-b bg-card px-4">
+          <div className="flex h-12 items-center gap-3">
+            <Skeleton className="size-7 shrink-0 rounded-md" />
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="size-7 shrink-0 rounded-md" />
+            <Skeleton className="size-7 shrink-0 rounded-md" />
+            <div className="ms-auto flex items-center gap-3">
+              <Skeleton className="hidden h-3 w-28 md:block" />
+              <Skeleton className="h-5 w-9 rounded-full" />
+              <Skeleton className="h-8 w-16 rounded-md" />
+            </div>
+          </div>
+        </div>
+        <div className="container mx-auto flex max-w-8xl flex-col gap-4 pt-4">
+          <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <Skeleton key={index} className="h-28 w-full rounded-lg" />
+            ))}
+          </div>
+          <Skeleton className="h-72 w-full rounded-lg" />
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Skeleton className="h-56 w-full rounded-lg" />
+            <Skeleton className="h-56 w-full rounded-lg" />
+          </div>
+          <Skeleton className="h-[600px] w-full rounded-xl" />
+        </div>
+      </div>
+    )
   }
 
   if (workflowQuery.error || !workflowQuery.data) {

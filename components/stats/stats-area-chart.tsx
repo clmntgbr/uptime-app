@@ -259,12 +259,76 @@ function bucketKeyFor(range: Exclude<TimeRange, "hour">, date: string) {
   return date
 }
 
+function durationHourAxis(runsHourly: RunHourCounts[], series: CallDurationSeries[]) {
+  if (runsHourly.length > 0) return runsHourly.map((hour) => hour.hour)
+  const keys = new Set<string>()
+  for (const call of series) {
+    for (const point of call.hourly ?? []) keys.add(point.hour)
+  }
+  return Array.from(keys).sort()
+}
+
 function buildDuration(
-  range: Exclude<TimeRange, "hour">,
+  range: TimeRange,
   series: CallDurationSeries[],
   dates: string[],
+  runsHourly: RunHourCounts[],
   incidents: IncidentRange[]
 ): { rows: Record<string, string | number | boolean>[]; calls: DurationCall[] } {
+  const ordered = [...series].sort(
+    (a, b) => a.position - b.position || a.name.localeCompare(b.name)
+  )
+
+  if (range === "hour") {
+    const hours = durationHourAxis(runsHourly, series)
+    if (hours.length === 0) return { rows: [], calls: [] }
+
+    const totals = new Map<string, Map<string, { duration: number; samples: number }>>()
+    const used = new Set<string>()
+    for (const call of ordered) {
+      const key = seriesKey(call.id)
+      for (const point of call.hourly ?? []) {
+        if (point.samples <= 0) continue
+        let calls = totals.get(point.hour)
+        if (!calls) {
+          calls = new Map()
+          totals.set(point.hour, calls)
+        }
+        const current = calls.get(key) ?? { duration: 0, samples: 0 }
+        current.duration += point.durationMs * point.samples
+        current.samples += point.samples
+        calls.set(key, current)
+        used.add(key)
+      }
+    }
+
+    const calls = ordered
+      .filter((call) => used.has(seriesKey(call.id)))
+      .map((call, index, visible) => ({
+        key: seriesKey(call.id),
+        name: call.name,
+        color: callColor(index, visible.length),
+      }))
+
+    const rows = hours.map((hour) => {
+      const row: Record<string, string | number | boolean> = {
+        key: hour,
+        label: formatHour(hour),
+        incident: overlapsIncidentHour(hour, incidents),
+      }
+      const values = totals.get(hour)
+      for (const call of calls) {
+        const value = values?.get(call.key)
+        if (value && value.samples > 0) {
+          row[call.key] = Math.round(value.duration / value.samples)
+        }
+      }
+      return row
+    })
+
+    return { rows, calls }
+  }
+
   const days = windowDays(range, dates)
   if (days.length === 0) return { rows: [], calls: [] }
 
@@ -291,9 +355,6 @@ function buildDuration(
 
   const totals = new Map<string, Map<string, { duration: number; samples: number }>>()
   const used = new Set<string>()
-  const ordered = [...series].sort(
-    (a, b) => a.position - b.position || a.name.localeCompare(b.name)
-  )
 
   for (const call of ordered) {
     const key = seriesKey(call.id)
@@ -343,11 +404,9 @@ function buildDuration(
 function TimeRangeToggle({
   value,
   onChange,
-  ranges = RANGES,
 }: {
   value: TimeRange
   onChange: (value: TimeRange) => void
-  ranges?: readonly { id: TimeRange; label: string }[]
 }) {
   return (
     <div
@@ -355,7 +414,7 @@ function TimeRangeToggle({
       role="group"
       aria-label="Time range"
     >
-      {ranges.map((range) => (
+      {RANGES.map((range) => (
         <button
           key={range.id}
           type="button"
@@ -373,8 +432,6 @@ function TimeRangeToggle({
   )
 }
 
-const DURATION_RANGES = RANGES.filter((range) => range.id !== "hour")
-
 export function StatsAreaChart({
   runsDaily,
   runsHourly = [],
@@ -387,8 +444,7 @@ export function StatsAreaChart({
   incidents?: IncidentRange[]
 }) {
   const [runsRange, setRunsRange] = React.useState<TimeRange>("1m")
-  const [durationRange, setDurationRange] =
-    React.useState<Exclude<TimeRange, "hour">>("1m")
+  const [durationRange, setDurationRange] = React.useState<TimeRange>("1m")
   const dates = React.useMemo(() => {
     const keys = new Set(runsDaily.map((day) => day.date))
     for (const call of callDurations) {
@@ -401,8 +457,9 @@ export function StatsAreaChart({
     [runsRange, runsDaily, runsHourly, dates, incidents]
   )
   const duration = React.useMemo(
-    () => buildDuration(durationRange, callDurations, dates, incidents),
-    [durationRange, callDurations, dates, incidents]
+    () =>
+      buildDuration(durationRange, callDurations, dates, runsHourly, incidents),
+    [durationRange, callDurations, dates, runsHourly, incidents]
   )
   const durationConfig = React.useMemo(
     () =>
@@ -472,10 +529,7 @@ export function StatsAreaChart({
             <CardTitle>Duration</CardTitle>
             <TimeRangeToggle
               value={durationRange}
-              onChange={(value) => {
-                if (value !== "hour") setDurationRange(value)
-              }}
-              ranges={DURATION_RANGES}
+              onChange={setDurationRange}
             />
           </CardHeader>
           <CardContent className="px-2 pt-4 sm:px-4">

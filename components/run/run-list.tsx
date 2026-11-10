@@ -3,6 +3,7 @@
 import { RunDrawer } from "@/components/run/run-drawer"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { formatLatencyMs, formatRunStatusLabel } from "@/lib/stats/format"
 import { useRuns } from "@/lib/run/hooks"
 import type { RunListItem } from "@/lib/run/types"
@@ -63,7 +64,21 @@ export function RunList({ workflowId }: { workflowId: string }) {
   return (
     <section className="flex flex-col gap-3">
       {runsQuery.isLoading ? (
-        <p className="text-muted-foreground">Loading runs…</p>
+        <ul className="divide-y rounded-md border">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <li
+              key={index}
+              className="flex items-center gap-3 px-4 py-2.5"
+            >
+              <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-28" />
+              </div>
+              <Skeleton className="h-4 w-12 shrink-0" />
+            </li>
+          ))}
+        </ul>
       ) : runsQuery.error ? (
         <p className="text-destructive">{runsQuery.error.message}</p>
       ) : !data?.members.length ? (

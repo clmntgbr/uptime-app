@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Empty,
   EmptyDescription,
@@ -86,7 +87,18 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {incidentsReady ? (
+        {!incidentsReady ? (
+          <Card size="sm" className="h-full md:col-span-1">
+            <CardHeader className="pb-0">
+              <Skeleton className="h-4 w-20" />
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col gap-3">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-4/5" />
+            </CardContent>
+          </Card>
+        ) : (
           <Card size="sm" className="h-full md:col-span-1">
             <CardHeader className="pb-0">
               <CardTitle>Incidents</CardTitle>
@@ -145,7 +157,7 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
               </CardFooter>
             ) : null}
           </Card>
-        ) : null}
+        )}
         <div className="h-full md:col-span-1">
           <LatestRunCard workflowId={workflowId} />
         </div>

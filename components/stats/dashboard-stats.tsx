@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   HoverCard,
   HoverCardContent,
@@ -139,10 +140,41 @@ function LastRunStatCard({
   )
 }
 
+function StatsCardsSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <Card key={index} className="@container/card">
+          <CardHeader>
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="mt-2 h-8 w-24" />
+          </CardHeader>
+          <CardFooter>
+            <Skeleton className="h-3 w-16" />
+          </CardFooter>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
+function ChartsSkeleton() {
+  return (
+    <div className="grid gap-4 lg:grid-cols-2">
+      <Skeleton className="h-72 w-full rounded-lg" />
+      <Skeleton className="h-72 w-full rounded-lg" />
+    </div>
+  )
+}
+
 export function DashboardCharts({ workflowId }: { workflowId?: string } = {}) {
   const statsQuery = useDashboardStats(workflowId)
 
-  if (statsQuery.isLoading || statsQuery.error || !statsQuery.data) {
+  if (statsQuery.isLoading) {
+    return <ChartsSkeleton />
+  }
+
+  if (statsQuery.error || !statsQuery.data) {
     return null
   }
 
@@ -172,7 +204,12 @@ export function DashboardStats({
   const statsQuery = useDashboardStats(workflowId)
 
   if (statsQuery.isLoading) {
-    return <p className="text-muted-foreground">Loading stats…</p>
+    return (
+      <div className="flex flex-col gap-4">
+        <StatsCardsSkeleton />
+        {showCharts ? <ChartsSkeleton /> : null}
+      </div>
+    )
   }
 
   if (statsQuery.error || !statsQuery.data) {
