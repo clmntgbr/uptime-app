@@ -511,7 +511,7 @@ function CallVariableForm({
           >
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent position="popper">
             {SOURCES.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}

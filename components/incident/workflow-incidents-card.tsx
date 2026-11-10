@@ -31,7 +31,7 @@ import { CheckCircle2Icon } from "lucide-react"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 
-const PREVIEW_LIMIT = 3
+const PREVIEW_LIMIT = 4
 
 export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
   const incidentsQuery = useActiveIncidents(workflowId)
@@ -92,7 +92,10 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
               <CardTitle>Incidents</CardTitle>
             </CardHeader>
             <CardContent
-              className={cn(isEmpty && "flex flex-1 items-center justify-center")}
+              className={cn(
+                "flex-1",
+                isEmpty && "flex items-center justify-center"
+              )}
             >
               {isEmpty ? (
                 <Empty className="border-0 p-4 md:p-6">
@@ -129,7 +132,7 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
               )}
             </CardContent>
             {hasMore ? (
-              <CardFooter className="border-t pt-3">
+              <CardFooter className="mt-auto border-t pt-3">
                 <Button
                   type="button"
                   variant="ghost"

@@ -159,85 +159,87 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
   const run = query.data?.run
 
   return (
-    <Card
-      size="sm"
-      className="h-full bg-card"
-      role="region"
-      aria-labelledby={titleId}
-    >
-      <CardHeader className="border-b">
-        <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2">
-          <CardTitle id={titleId} className="justify-self-start">
-            Last run
-          </CardTitle>
-          {run ? (
-            <p className="text-center text-muted-foreground tabular-nums">
-              {formatLatencyMs(run.durationMs)}
-            </p>
-          ) : (
-            <span />
-          )}
-          {run ? (
-            <div className="justify-self-end">
-              <RunStatusBadge status={run.status} />
+    <>
+      <Card
+        size="sm"
+        className="h-full bg-card"
+        role="region"
+        aria-labelledby={titleId}
+      >
+        <CardHeader className="border-b">
+          <div className="grid w-full grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <CardTitle id={titleId} className="justify-self-start">
+              Last run
+            </CardTitle>
+            {run ? (
+              <p className="text-center text-muted-foreground tabular-nums">
+                {formatLatencyMs(run.durationMs)}
+              </p>
+            ) : (
+              <span />
+            )}
+            {run ? (
+              <div className="justify-self-end">
+                <RunStatusBadge status={run.status} />
+              </div>
+            ) : (
+              <span />
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="flex-1">
+          {query.isLoading ? (
+            <div className="flex flex-col gap-3">
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ) : query.error ? (
+            <div className="flex flex-col items-start gap-2">
+              <p className="text-destructive">{query.error.message}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void query.refetch()}
+              >
+                Retry
+              </Button>
+            </div>
+          ) : !run ? (
+            <div className="flex flex-col items-start gap-3">
+              <p className="text-muted-foreground">No runs yet</p>
+              <Button
+                type="button"
+                size="sm"
+                disabled={runMutation.isPending}
+                onClick={() => runMutation.mutate(workflowId)}
+              >
+                {runMutation.isPending ? "Starting…" : "Run"}
+              </Button>
             </div>
           ) : (
-            <span />
+            <CallCascadeList
+              calls={previewCalls}
+              runDurationMs={run.durationMs}
+              onOpenCall={openCall}
+            />
           )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {query.isLoading ? (
-          <div className="flex flex-col gap-3">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-8 w-full" />
-            <Skeleton className="h-8 w-full" />
-          </div>
-        ) : query.error ? (
-          <div className="flex flex-col items-start gap-2">
-            <p className="text-destructive">{query.error.message}</p>
+        </CardContent>
+        {run && hasMore ? (
+          <CardFooter className="mt-auto border-t pt-3">
             <Button
               type="button"
-              variant="outline"
+              variant="ghost"
               size="sm"
-              onClick={() => void query.refetch()}
+              className="px-0"
+              onClick={() => setAllCallsOpen(true)}
             >
-              Retry
+              See all ({orderedCalls.length})
             </Button>
-          </div>
-        ) : !run ? (
-          <div className="flex flex-col items-start gap-3">
-            <p className="text-muted-foreground">No runs yet</p>
-            <Button
-              type="button"
-              size="sm"
-              disabled={runMutation.isPending}
-              onClick={() => runMutation.mutate(workflowId)}
-            >
-              {runMutation.isPending ? "Starting…" : "Run"}
-            </Button>
-          </div>
-        ) : (
-          <CallCascadeList
-            calls={previewCalls}
-            runDurationMs={run.durationMs}
-            onOpenCall={openCall}
-          />
-        )}
-      </CardContent>
-      {run && hasMore ? (
-        <CardFooter className="border-t pt-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="px-0"
-            onClick={() => setAllCallsOpen(true)}
-          >
-            See all ({orderedCalls.length})
-          </Button>
-        </CardFooter>
-      ) : null}
+          </CardFooter>
+        ) : null}
+      </Card>
 
       <Dialog open={allCallsOpen} onOpenChange={setAllCallsOpen}>
         <DialogContent className="max-h-[min(80vh,40rem)] overflow-y-auto sm:max-w-md data-open:zoom-in-90 data-closed:zoom-out-95">
@@ -268,6 +270,6 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
         open={callDrawerOpen}
         onOpenChange={setCallDrawerOpen}
       />
-    </Card>
+    </>
   )
 }
