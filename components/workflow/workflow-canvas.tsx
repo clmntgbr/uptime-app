@@ -1,6 +1,7 @@
 "use client"
 
 import { CallDrawer } from "@/components/call/call-drawer"
+import { LatencySparkline } from "@/components/call/latency-sparkline"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,7 +67,7 @@ const MAX_ZOOM = 2
 const ZOOM_STEP = 0.1
 const DEFAULT_ZOOM = 1.25
 const PAN_THRESHOLD = 4
-const BASE_CARD_WIDTH = 280
+const BASE_CARD_WIDTH = 420
 const CARD_RADIUS = 16
 /** Fan along the top-right corner arc (degrees from +X, CCW). */
 const CORNER_FAN_ANGLES = [88, 45, 2] as const
@@ -157,9 +158,12 @@ function StatusDot({
 }
 
 function CallCardBody({ call, zoom }: { call: Call; zoom: number }) {
+  // Fixed slot so sparklines stay right-aligned at every zoom level.
+  const sparkSlotWidth = 72 * zoom
+
   return (
     <>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden">
         <p className="truncate text-foreground">{call.name}</p>
         <span
           className="block truncate font-normal text-muted-foreground"
@@ -168,7 +172,20 @@ function CallCardBody({ call, zoom }: { call: Call; zoom: number }) {
           <VariableText text={call.url || "—"} />
         </span>
       </div>
-      <StatusDot status={call.lastStatus} zoom={zoom} className="self-center" />
+      <div
+        className="ml-auto flex shrink-0 items-center justify-end"
+        style={{ gap: 8 * zoom }}
+      >
+        <div
+          className="flex items-center justify-end overflow-hidden"
+          style={{ width: sparkSlotWidth }}
+        >
+          {call.recentRuns && call.recentRuns.length > 0 ? (
+            <LatencySparkline runs={call.recentRuns} scale={zoom} />
+          ) : null}
+        </div>
+        <StatusDot status={call.lastStatus} zoom={zoom} />
+      </div>
     </>
   )
 }

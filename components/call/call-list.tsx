@@ -21,11 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
+import { LatencySparkline } from "@/components/call/latency-sparkline"
 import {
   Table,
   TableBody,
@@ -42,7 +38,7 @@ import {
   useDeleteCall,
   useReorderCalls,
 } from "@/lib/call/hooks"
-import type { Call, CallRecentRun } from "@/lib/call/types"
+import type { Call } from "@/lib/call/types"
 import {
   useGlobalVariables,
   useStaticVariables,
@@ -101,9 +97,6 @@ const COL = {
   actions: "w-10",
 } as const
 
-const SPARK_MIN_PX = 3
-const SPARK_MAX_PX = 24
-
 function methodClass(method: string | undefined) {
   switch ((method ?? "").toUpperCase()) {
     case "GET":
@@ -135,168 +128,6 @@ function statusBadge(status: string | undefined) {
     return { label: "Skipped", variant: "outline" as const }
   }
   return { label: "Never", variant: "outline" as const }
-}
-
-function sparkBarClass(status: string | undefined) {
-  if (status === "success") return "bg-[#8FD2B0] dark:bg-emerald-400/80"
-  if (status === "failed") return "bg-orange-400 dark:bg-orange-400/90"
-  if (status === "error") return "bg-red-500 dark:bg-red-400"
-  if (status === "skipped") return "bg-muted-foreground/35"
-  if (status === "running") return "bg-sky-400"
-  return "bg-muted-foreground/30"
-}
-
-function formatTimingMs(ms: number) {
-  if (!Number.isFinite(ms)) return "—"
-  if (Math.abs(ms) < 1000) return `${Math.round(ms)}ms`
-  const seconds = ms / 1000
-  return `${seconds >= 10 ? seconds.toFixed(0) : seconds.toFixed(1)}s`
-}
-
-function formatHoverStamp(iso: string | undefined) {
-  if (!iso) return null
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return null
-  const time = date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    second: "2-digit",
-    timeZoneName: "short",
-  })
-  const day = date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-  })
-  return `${time} · ${day}`
-}
-
-function timingRows(run: CallRecentRun) {
-  const dns = run.timings?.dns ?? 0
-  const connect = run.timings?.connect ?? 0
-  const tls = run.timings?.tls ?? 0
-  const transfer = run.timings?.transfer ?? 0
-  const waiting = Math.max(
-    0,
-    (run.latencyMs ?? 0) - dns - connect - tls - transfer
-  )
-  return [
-    { key: "dns", label: "Name lookup", swatch: "bg-violet-500", ms: dns },
-    { key: "connect", label: "Connection", swatch: "bg-blue-500", ms: connect },
-    { key: "tls", label: "TLS handshake", swatch: "bg-teal-400", ms: tls },
-    { key: "waiting", label: "Waiting", swatch: "bg-amber-400", ms: waiting },
-    {
-      key: "transfer",
-      label: "Data transfer",
-      swatch: "bg-emerald-500",
-      ms: transfer,
-    },
-  ]
-}
-
-function LatencySparkline({ runs }: { runs: CallRecentRun[] }) {
-  if (!runs.length) return null
-
-  const maxLatency = Math.max(1, ...runs.map((run) => run.latencyMs ?? 0))
-
-  return (
-    <div
-      className="flex h-6 items-end gap-0.5"
-      role="img"
-      aria-label={`Latency of the last ${runs.length} runs`}
-    >
-      {runs.map((run) => {
-        const ratio = (run.latencyMs ?? 0) / maxLatency
-        const height = Math.max(SPARK_MIN_PX, Math.round(ratio * SPARK_MAX_PX))
-        const total =
-          run.latencyMs != null ? formatTimingMs(run.latencyMs) : null
-        const stamp = formatHoverStamp(run.finishedAt)
-        const status =
-          run.status.charAt(0).toUpperCase() + run.status.slice(1)
-        const phases = timingRows(run)
-        const phaseMax = Math.max(1, ...phases.map((phase) => phase.ms))
-
-        return (
-          <HoverCard key={run.id} openDelay={120} closeDelay={80}>
-            <HoverCardTrigger asChild>
-              <button
-                type="button"
-                className="flex h-6 w-1.5 items-end justify-center"
-                aria-label={[stamp, total, run.status]
-                  .filter(Boolean)
-                  .join(", ")}
-              >
-                <span
-                  className={cn(
-                    "block w-1 rounded-[1px]",
-                    sparkBarClass(run.status)
-                  )}
-                  style={{ height }}
-                />
-              </button>
-            </HoverCardTrigger>
-            <HoverCardContent side="top" className="w-64 p-3">
-              <div className="flex flex-col gap-3">
-                {stamp && (
-                  <p className="text-[11px] text-muted-foreground">{stamp}</p>
-                )}
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  <span className="flex items-center gap-1.5 font-medium text-foreground">
-                    <span
-                      className={cn(
-                        "size-1.5 rounded-full",
-                        sparkBarClass(run.status)
-                      )}
-                    />
-                    {status}
-                  </span>
-                  {run.httpStatus != null && (
-                    <span className="text-muted-foreground">
-                      HTTP {run.httpStatus}
-                    </span>
-                  )}
-                </div>
-                <div className="flex flex-col">
-                  <p className="text-2xl font-semibold tracking-tight text-foreground">
-                    {total ?? "—"}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Total</p>
-                </div>
-                <div className="flex flex-col gap-2 border-t border-border pt-2.5">
-                  {phases.map((phase) => {
-                    const width = Math.round((phase.ms / phaseMax) * 100)
-                    return (
-                      <div key={phase.key} className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 text-xs">
-                          <span
-                            className={cn(
-                              "size-2 shrink-0 rounded-[2px]",
-                              phase.swatch
-                            )}
-                          />
-                          <span className="min-w-0 flex-1">{phase.label}</span>
-                          <span className="tabular-nums text-muted-foreground">
-                            {formatTimingMs(phase.ms)}
-                          </span>
-                        </div>
-                        <div className="h-1 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className={cn("h-full rounded-full", phase.swatch)}
-                            style={{
-                              width: `${phase.ms > 0 ? Math.max(width, 6) : 0}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </HoverCardContent>
-          </HoverCard>
-        )
-      })}
-    </div>
-  )
 }
 
 function CallTableColgroup() {
