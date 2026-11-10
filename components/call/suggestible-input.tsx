@@ -53,6 +53,8 @@ export function SuggestibleInput({
   const withVariables = variables.length > 0
 
   useEffect(() => {
+    if (!focused) return
+
     let cancelled = false
     const handle = window.setTimeout(() => {
       void searchCallSuggestions(workflowId, kind, value, 20)
@@ -67,7 +69,7 @@ export function SuggestibleInput({
       cancelled = true
       window.clearTimeout(handle)
     }
-  }, [workflowId, kind, value])
+  }, [focused, workflowId, kind, value])
 
   const trigger = focused && withVariables ? getVariableTrigger(value, cursor) : null
   const variableQuery = trigger?.query.toLowerCase() ?? ""

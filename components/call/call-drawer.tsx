@@ -452,7 +452,12 @@ function CallForm({
                   Optional JSON request body
                 </p>
               </div>
-              <JsonBodyInput value={body} onChange={setBody} title="Body" />
+              <JsonBodyInput
+                value={body}
+                onChange={setBody}
+                title="Body"
+                variables={variables}
+              />
             </div>
           </div>
         </div>
