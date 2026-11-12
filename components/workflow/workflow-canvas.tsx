@@ -22,6 +22,7 @@ import {
   useReorderCalls,
 } from "@/lib/call/hooks"
 import type { Call } from "@/lib/call/types"
+import { useWorkflow } from "@/lib/workflow/hooks"
 import { cn } from "@/lib/utils"
 import {
   closestCenter,
@@ -121,21 +122,48 @@ function cornerFanStyle(
   }
 }
 
-function statusDotClass(status: string | undefined) {
+function methodClass(method: string | undefined) {
+  switch ((method ?? "").toUpperCase()) {
+    case "GET":
+      return "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+    case "POST":
+      return "bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
+    case "PUT":
+      return "bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
+    case "PATCH":
+      return "bg-violet-50 text-violet-800 dark:bg-violet-950 dark:text-violet-300"
+    case "DELETE":
+      return "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-300"
+    default:
+      return "bg-muted text-muted-foreground"
+  }
+}
+
+function statusDotClass(status: string) {
   if (status === "success") return "bg-[#8FD2B0] dark:bg-emerald-400/80"
   if (status === "failed") return "bg-orange-400 dark:bg-orange-400/90"
   if (status === "error") return "bg-red-500 dark:bg-red-400"
   if (status === "skipped") return "bg-muted-foreground/35"
-  if (status === "running") return "bg-sky-400"
+  if (status === "running") return "bg-orange-400 dark:bg-orange-400/90"
   return "bg-muted-foreground/30"
 }
 
-function statusLabel(status: string | undefined) {
+function statusLabel(status: string) {
   if (status === "success") return "Success"
   if (status === "failed" || status === "error") return "Failed"
   if (status === "running") return "Running"
   if (status === "skipped") return "Skipped"
-  return "Never"
+  return status
+}
+
+/** Resolve the canvas pill: current status, else orange while the workflow runs. */
+function canvasDotStatus(
+  lastStatus: string | undefined,
+  isRunning: boolean
+): string | undefined {
+  if (lastStatus) return lastStatus
+  if (isRunning) return "running"
+  return undefined
 }
 
 function StatusDot({
@@ -143,7 +171,7 @@ function StatusDot({
   zoom,
   className,
 }: {
-  status: string | undefined
+  status: string
   zoom: number
   className?: string
 }) {
@@ -158,12 +186,38 @@ function StatusDot({
   )
 }
 
-function CallCardBody({ call, zoom }: { call: Call; zoom: number }) {
+function CallCardBody({
+  call,
+  zoom,
+  isRunning,
+}: {
+  call: Call
+  zoom: number
+  isRunning: boolean
+}) {
   // Fixed slot so sparklines stay right-aligned at every zoom level.
   const sparkSlotWidth = 72 * zoom
+  const method = (call.method ?? "GET").toUpperCase()
+  const methodWidth = 40 * zoom
+  const methodHeight = 22 * zoom
+  const dotStatus = canvasDotStatus(call.lastStatus, isRunning)
 
   return (
     <>
+      <span
+        title={method}
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center rounded-md font-mono font-semibold",
+          methodClass(call.method)
+        )}
+        style={{
+          width: methodWidth,
+          height: methodHeight,
+          fontSize: `${10 * zoom}px`,
+        }}
+      >
+        {method}
+      </span>
       <div className="min-w-0 flex-1 overflow-hidden">
         <p className="truncate text-foreground">{call.name}</p>
         <span
@@ -185,7 +239,7 @@ function CallCardBody({ call, zoom }: { call: Call; zoom: number }) {
             <LatencySparkline runs={call.recentRuns} scale={zoom} />
           ) : null}
         </div>
-        <StatusDot status={call.lastStatus} zoom={zoom} />
+        {dotStatus ? <StatusDot status={dotStatus} zoom={zoom} /> : null}
       </div>
     </>
   )
@@ -243,12 +297,14 @@ function CallHoverAction({
 function SortableCallCard({
   call,
   zoom,
+  isRunning,
   onEdit,
   onCopy,
   onDelete,
 }: {
   call: Call
   zoom: number
+  isRunning: boolean
   onEdit: () => void
   onCopy: () => void
   onDelete: () => void
@@ -326,19 +382,27 @@ function SortableCallCard({
         {...attributes}
         {...listeners}
       >
-        <CallCardBody call={call} zoom={zoom} />
+        <CallCardBody call={call} zoom={zoom} isRunning={isRunning} />
       </div>
     </div>
   )
 }
 
-function CallCardOverlay({ call, zoom }: { call: Call; zoom: number }) {
+function CallCardOverlay({
+  call,
+  zoom,
+  isRunning,
+}: {
+  call: Call
+  zoom: number
+  isRunning: boolean
+}) {
   return (
     <div
       style={callCardStyle(zoom)}
       className="flex cursor-grabbing items-center border bg-card font-medium shadow-lg ring-1 ring-foreground/10"
     >
-      <CallCardBody call={call} zoom={zoom} />
+      <CallCardBody call={call} zoom={zoom} isRunning={isRunning} />
     </div>
   )
 }
@@ -397,10 +461,12 @@ function CanvasControls({
 
 /** Vertical sortable list of workflow calls. */
 export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
+  const workflowQuery = useWorkflow(workflowId)
   const callsQuery = useCalls(workflowId)
   const reorderMutation = useReorderCalls(workflowId)
   const copyMutation = useCopyCall(workflowId)
   const deleteMutation = useDeleteCall(workflowId)
+  const isRunning = workflowQuery.data?.isRunning === true
   const [activeId, setActiveId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editedId, setEditedId] = useState<string | null>(null)
@@ -622,6 +688,7 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
                         <SortableCallCard
                           call={call}
                           zoom={zoom}
+                          isRunning={isRunning}
                           onEdit={() => openEdit(call.id)}
                           onCopy={() => copyMutation.mutate(call.id)}
                           onDelete={() => setCallToDelete(call)}
@@ -632,7 +699,11 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
                 </SortableContext>
                 <DragOverlay dropAnimation={DROP_ANIMATION}>
                   {active ? (
-                    <CallCardOverlay call={active} zoom={zoom} />
+                    <CallCardOverlay
+                      call={active}
+                      zoom={zoom}
+                      isRunning={isRunning}
+                    />
                   ) : null}
                 </DragOverlay>
               </DndContext>

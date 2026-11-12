@@ -2,6 +2,8 @@ export type RealtimeEventType =
   | "workflow.started"
   | "workflow.finished"
   | "workflow.updated"
+  | "call.started"
+  | "call.finished"
   | "expiry.alerted"
   | "incident.opened"
   | "incident.acknowledged"
@@ -14,6 +16,8 @@ export interface UserStreamEvent {
   userId?: string
   workflowId?: string
   runId?: string
+  callId?: string
+  status?: string
   incidentId?: string
 }
 
@@ -21,6 +25,8 @@ const EVENT_TYPES = new Set<string>([
   "workflow.started",
   "workflow.finished",
   "workflow.updated",
+  "call.started",
+  "call.finished",
   "expiry.alerted",
   "incident.opened",
   "incident.acknowledged",

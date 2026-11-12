@@ -1,3 +1,4 @@
+import type { Call } from "@/lib/call/types"
 import { queryKeys } from "@/lib/query/keys"
 import type { DashboardStats } from "@/lib/stats/types"
 import type { Workflow } from "@/lib/workflow/types"
