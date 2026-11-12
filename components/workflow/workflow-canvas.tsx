@@ -46,6 +46,7 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import {
+  ArrowDownIcon,
   CopyIcon,
   Maximize2Icon,
   PencilIcon,
@@ -164,6 +165,25 @@ function canvasDotStatus(
   if (lastStatus) return lastStatus
   if (isRunning) return "running"
   return undefined
+}
+
+function CallConnector({ zoom, height }: { zoom: number; height: number }) {
+  const arrow = 14 * zoom
+
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute left-1/2 top-0 flex -translate-x-1/2 flex-col items-center text-muted-foreground/50"
+      style={{ height }}
+    >
+      <span className="w-px flex-1 bg-current" />
+      <ArrowDownIcon
+        className="shrink-0"
+        style={{ width: arrow, height: arrow, marginTop: -2 * zoom }}
+        strokeWidth={2.25}
+      />
+    </div>
+  )
 }
 
 function StatusDot({
@@ -679,11 +699,7 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
                         }
                       >
                         {index > 0 ? (
-                          <div
-                            aria-hidden
-                            className="absolute left-1/2 w-px -translate-x-1/2 bg-muted-foreground/40"
-                            style={{ top: 0, height: connectorHeight }}
-                          />
+                          <CallConnector zoom={zoom} height={connectorHeight} />
                         ) : null}
                         <SortableCallCard
                           call={call}
