@@ -1,6 +1,7 @@
 "use client"
 
 import { AppSidebar } from "@/components/app-sidebar"
+import { LibraryDrawer } from "@/components/library/library-drawer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -43,6 +44,8 @@ export function AppShell({
   children: React.ReactNode
   defaultSidebarOpen?: boolean
 }) {
+  const [libraryOpen, setLibraryOpen] = useState(false)
+
   return (
     <SidebarProvider
       defaultOpen={defaultSidebarOpen}
@@ -52,7 +55,8 @@ export function AppShell({
         } as React.CSSProperties
       }
     >
-      <AppSidebar />
+      <AppSidebar onOpenLibrary={() => setLibraryOpen(true)} />
+      <LibraryDrawer open={libraryOpen} onOpenChange={setLibraryOpen} />
       <SidebarInset>
         <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-card px-4">
           <SidebarTrigger className="-ms-1" />

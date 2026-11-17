@@ -10,12 +10,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
 } from "@/components/ui/sidebar"
-import { GalleryVerticalEndIcon, Mail, PlusCircleIcon } from "lucide-react"
-import { Button } from "./ui/button"
+import { GalleryVerticalEndIcon, Library } from "lucide-react"
 
 // This is sample data.
 const data = {
@@ -158,7 +154,12 @@ const data = {
   ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({
+  onOpenLibrary,
+  ...props
+}: React.ComponentProps<typeof Sidebar> & {
+  onOpenLibrary?: () => void
+}) {
   return (
     <Sidebar variant="floating" {...props}>
       <SidebarHeader>
@@ -177,47 +178,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <SidebarMenuItem className="flex items-center gap-2">
-          <SidebarMenuButton
-            tooltip="Quick Create"
-            className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-          >
-            <PlusCircleIcon className="size-4" />
-            <span>Quick Create</span>
-          </SidebarMenuButton>
-          <Button
-            size="icon"
-            className="size-8 group-data-[collapsible=icon]:opacity-0"
-            variant="outline"
-          >
-            <Mail />
-            <span className="sr-only">Inbox</span>
-          </Button>
-        </SidebarMenuItem>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarMenu className="gap-2">
-            {data.navMain.map((item) => (
-              <SidebarMenuItem key={item.title}>
-                <SidebarMenuButton asChild>
-                  <a href={item.url} className="font-medium">
-                    {item.title}
-                  </a>
-                </SidebarMenuButton>
-                {item.items?.length ? (
-                  <SidebarMenuSub className="ms-0 border-s-0 px-1.5">
-                    {item.items.map((item) => (
-                      <SidebarMenuSubItem key={item.title}>
-                        <SidebarMenuSubButton asChild isActive={item.isActive}>
-                          <a href={item.url}>{item.title}</a>
-                        </SidebarMenuSubButton>
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                ) : null}
-              </SidebarMenuItem>
-            ))}
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                className="font-medium"
+                tooltip="Library"
+                onClick={onOpenLibrary}
+              >
+                <Library className="size-4" />
+                <span>Library</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>

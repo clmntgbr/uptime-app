@@ -54,16 +54,21 @@ function SheetContent({
   side = "right",
   showCloseButton = true,
   nested = false,
+  overlay = true,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
   /** Stack above an already-open sheet (higher z-index, used with `modal={false}`). */
   nested?: boolean
+  /** Dimmed backdrop. Off for non-modal panels that must keep the page usable. */
+  overlay?: boolean
 }) {
   return (
     <SheetPortal>
-      <SheetOverlay className={nested ? "z-[60]" : undefined} />
+      {overlay ? (
+        <SheetOverlay className={nested ? "z-[60]" : undefined} />
+      ) : null}
       <SheetPrimitive.Content
         data-slot="sheet-content"
         data-side={side}

@@ -421,9 +421,20 @@ interface CallVariableFormProps {
   onDelete?: () => void
 }
 
-/** Response keys are dotted paths; JSONPath expressions must start with `$`. */
+/** Response keys are dotted paths (`member.0.id`); JSONPath may use brackets. */
+function normalizeJsonPath(path: string) {
+  return path
+    .replace(/^\$\.?/, "")
+    .replace(/\[(\d+)\]/g, ".$1")
+    .replace(/^\./, "")
+    .toLowerCase()
+}
+
+/** Turn API dotted keys into JSONPath, with `[n]` for numeric segments. */
 function toJsonPath(key: string) {
-  return key.startsWith("$") ? key : `$.${key}`
+  const body = key.startsWith("$") ? key.replace(/^\$\.?/, "") : key
+  const pretty = body.replace(/\.(\d+)(?=\.|$)/g, "[$1]")
+  return pretty.startsWith("$") ? pretty : `$.${pretty}`
 }
 
 function CallVariableForm({
@@ -452,10 +463,16 @@ function CallVariableForm({
     source === "json" && !!callId
   )
 
-  const query = path.replace(/^\$\.?/, "").toLowerCase()
-  const suggestions = (responseKeysQuery.data ?? []).filter(
-    (key) => !query || key.toLowerCase().includes(query)
-  )
+  const query = normalizeJsonPath(path)
+  const suggestions = (responseKeysQuery.data ?? []).filter((key) => {
+    if (!query) return true
+    const normalized = normalizeJsonPath(key)
+    return (
+      normalized === query ||
+      normalized.startsWith(`${query}.`) ||
+      normalized.includes(query)
+    )
+  })
   const showSuggestions =
     source === "json" && pathFocused && suggestions.length > 0
 

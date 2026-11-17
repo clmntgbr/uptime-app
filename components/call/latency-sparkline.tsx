@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/tooltip"
 import type { CallRecentRun } from "@/lib/call/types"
 import { cn } from "@/lib/utils"
+import { useState } from "react"
 
 const SPARK_MIN_PX = 3
 const SPARK_MAX_PX = 24
@@ -107,6 +108,8 @@ export function LatencySparkline({
   /** Scales bar size for zoomable surfaces (e.g. workflow canvas). */
   scale?: number
 }) {
+  const [activeId, setActiveId] = useState<string | null>(null)
+
   if (!runs.length) return null
 
   const maxLatency = Math.max(1, ...runs.map((run) => run.latencyMs ?? 0))
@@ -136,20 +139,34 @@ export function LatencySparkline({
           run.status.charAt(0).toUpperCase() + run.status.slice(1)
         const phases = timingRows(run)
         const phaseMax = Math.max(1, ...phases.map((phase) => phase.ms))
+        const isActive = activeId === run.id
+        const isDimmed = activeId != null && !isActive
 
         return (
-          <HoverCard key={run.id} openDelay={120} closeDelay={80}>
+          <HoverCard
+            key={run.id}
+            openDelay={120}
+            closeDelay={80}
+            open={isActive}
+            onOpenChange={(open) => setActiveId(open ? run.id : null)}
+          >
             <HoverCardTrigger asChild>
               <button
                 type="button"
-                className="flex items-end justify-center"
+                className="relative z-0 flex items-end justify-center data-[state=open]:z-10"
                 style={{ height: rowH, width: hitW }}
                 aria-label={[stamp, total, run.status]
                   .filter(Boolean)
                   .join(", ")}
               >
                 <span
-                  className={cn("block rounded-[1px]", sparkBarClass(run.status))}
+                  className={cn(
+                    "block rounded-[1px] transition-[opacity,box-shadow,transform] duration-100",
+                    sparkBarClass(run.status),
+                    isActive &&
+                      "relative z-10 scale-x-125 shadow-[0_0_0_1.5px] shadow-foreground/80",
+                    isDimmed && "opacity-30"
+                  )}
                   style={{ height, width: barW }}
                 />
               </button>

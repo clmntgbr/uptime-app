@@ -29,6 +29,13 @@ export const queryKeys = {
       [...queryKeys.calls.all(workflowId), callId] as const,
   },
 
+  library: {
+    all: ["library"] as const,
+    list: (search: string, methods: string[] = []) =>
+      [...queryKeys.library.all, "list", search, methods] as const,
+    detail: (id: string) => [...queryKeys.library.all, "detail", id] as const,
+  },
+
   context: {
     all: (workflowId: string) =>
       [...queryKeys.workflows.detail(workflowId), "context"] as const,

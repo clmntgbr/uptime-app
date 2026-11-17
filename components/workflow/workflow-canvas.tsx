@@ -23,6 +23,9 @@ import {
 } from "@/lib/call/hooks"
 import type { Call } from "@/lib/call/types"
 import { useWorkflow } from "@/lib/workflow/hooks"
+import { methodClass } from "@/lib/call/method-style"
+import { useInsertLibraryItem } from "@/lib/library/hooks"
+import { LIBRARY_ITEM_MIME } from "@/lib/library/types"
 import { cn } from "@/lib/utils"
 import {
   closestCenter,
@@ -54,6 +57,7 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from "lucide-react"
+import { toast } from "sonner"
 import {
   useCallback,
   useEffect,
@@ -61,6 +65,7 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type DragEvent,
   type PointerEvent,
   type ReactNode,
 } from "react"
@@ -120,23 +125,6 @@ function cornerFanStyle(
   return {
     top: y - buttonSize / 2,
     left: `calc(100% + ${x - buttonSize / 2}px)`,
-  }
-}
-
-function methodClass(method: string | undefined) {
-  switch ((method ?? "").toUpperCase()) {
-    case "GET":
-      return "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-    case "POST":
-      return "bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-300"
-    case "PUT":
-      return "bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
-    case "PATCH":
-      return "bg-violet-50 text-violet-800 dark:bg-violet-950 dark:text-violet-300"
-    case "DELETE":
-      return "bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-300"
-    default:
-      return "bg-muted text-muted-foreground"
   }
 }
 
@@ -486,6 +474,8 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
   const reorderMutation = useReorderCalls(workflowId)
   const copyMutation = useCopyCall(workflowId)
   const deleteMutation = useDeleteCall(workflowId)
+  const insertLibraryMutation = useInsertLibraryItem(workflowId)
+  const [libraryDragOver, setLibraryDragOver] = useState(false)
   const isRunning = workflowQuery.data?.isRunning === true
   const [activeId, setActiveId] = useState<string | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -591,6 +581,34 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
     }
   }, [])
 
+  const isLibraryDrag = (event: DragEvent<HTMLDivElement>) =>
+    Array.from(event.dataTransfer.types).includes(LIBRARY_ITEM_MIME)
+
+  const onLibraryDragOver = (event: DragEvent<HTMLDivElement>) => {
+    if (!isLibraryDrag(event)) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = "copy"
+    setLibraryDragOver(true)
+  }
+
+  const onLibraryDragLeave = (event: DragEvent<HTMLDivElement>) => {
+    // Ignore moves between the canvas and its own children.
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+    setLibraryDragOver(false)
+  }
+
+  const onLibraryDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!isLibraryDrag(event)) return
+    event.preventDefault()
+    setLibraryDragOver(false)
+    const itemId = event.dataTransfer.getData(LIBRARY_ITEM_MIME)
+    if (!itemId) return
+    // Always appended at the end of the workflow.
+    insertLibraryMutation.mutate(itemId, {
+      onSuccess: () => toast.success("Added to workflow"),
+    })
+  }
+
   const onDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id))
   }
@@ -625,7 +643,15 @@ export function WorkflowCanvas({ workflowId }: { workflowId: string }) {
   }
 
   return (
-    <div className="relative h-[600px] w-full overflow-hidden rounded-xl border bg-card">
+    <div
+      className={cn(
+        "relative h-[600px] w-full overflow-hidden rounded-xl border bg-card transition-shadow",
+        libraryDragOver && "ring-2 ring-primary ring-inset"
+      )}
+      onDragOver={onLibraryDragOver}
+      onDragLeave={onLibraryDragLeave}
+      onDrop={onLibraryDrop}
+    >
       <div
         ref={viewportRef}
         className={cn(
