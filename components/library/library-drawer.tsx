@@ -14,6 +14,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -32,7 +40,13 @@ import { methodClass } from "@/lib/call/method-style"
 import { cn } from "@/lib/utils"
 import { useCurrentWorkflowId } from "@/lib/workflow/current"
 import type { LibraryItemSummary } from "@/lib/library/types"
-import { Loader2Icon, PlusIcon, SearchIcon, UploadIcon } from "lucide-react"
+import {
+  ChevronsUpDownIcon,
+  Loader2Icon,
+  PlusIcon,
+  SearchIcon,
+  UploadIcon,
+} from "lucide-react"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
@@ -191,36 +205,68 @@ export function LibraryDrawer({ open, onOpenChange }: LibraryDrawerProps) {
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-1 px-4 pt-3">
-            {LIBRARY_METHODS.map((method) => {
-              const active = methods.includes(method)
-              return (
-                <button
-                  key={method}
+          <div className="px-4 pt-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
                   type="button"
-                  aria-pressed={active}
-                  onClick={() => toggleMethod(method)}
-                  className={cn(
-                    "rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold transition-opacity",
-                    methodClass(method),
-                    active
-                      ? "ring-2 ring-primary ring-offset-1 ring-offset-card"
-                      : "opacity-50 hover:opacity-100"
-                  )}
+                  size="sm"
+                  variant="outline"
+                  className="h-8 w-full justify-between gap-2 px-2 text-xs"
+                  aria-label="Filter by method"
                 >
-                  {method}
-                </button>
-              )
-            })}
-            {methods.length > 0 ? (
-              <button
-                type="button"
-                onClick={() => setMethods([])}
-                className="px-1.5 py-0.5 text-[10px] text-muted-foreground underline-offset-2 hover:underline"
-              >
-                Clear
-              </button>
-            ) : null}
+                  {methods.length > 0 ? (
+                    <span className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+                      {methods.slice(0, 4).map((method) => (
+                        <span
+                          key={method}
+                          className={cn(
+                            "shrink-0 rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold",
+                            methodClass(method)
+                          )}
+                        >
+                          {method}
+                        </span>
+                      ))}
+                      {methods.length > 4 ? (
+                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                          +{methods.length - 4}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">Methods</span>
+                  )}
+                  <ChevronsUpDownIcon className="size-3.5 shrink-0 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                <DropdownMenuLabel className="flex items-center justify-between gap-2 font-normal">
+                  <span>Methods</span>
+                  {methods.length > 0 ? (
+                    <button
+                      type="button"
+                      className="text-[10px] text-muted-foreground underline-offset-2 hover:underline"
+                      onClick={() => setMethods([])}
+                    >
+                      Clear
+                    </button>
+                  ) : null}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {LIBRARY_METHODS.map((method) => (
+                  <DropdownMenuCheckboxItem
+                    key={method}
+                    checked={methods.includes(method)}
+                    onCheckedChange={() => toggleMethod(method)}
+                    onSelect={(event) => event.preventDefault()}
+                    className="font-mono text-xs"
+                  >
+                    {method}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <div

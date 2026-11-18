@@ -37,8 +37,8 @@ export function useLibraryItems(
       listLibraryItems({
         search: search || undefined,
         methods,
-        sortBy: "name",
-        orderBy: "asc",
+        sortBy: "createdAt",
+        orderBy: "desc",
         page: pageParam,
         limit: LIBRARY_PAGE_SIZE,
       }),
