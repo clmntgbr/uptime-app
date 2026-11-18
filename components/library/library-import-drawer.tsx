@@ -457,7 +457,7 @@ export function LibraryImportDrawer({
   const selectedCandidates: LibraryImportCandidate[] =
     preview?.items.filter((candidate) => selected[candidate.key]) ?? []
 
-  const confirm = async () => {
+  const confirm = () => {
     setError(null)
     if (selectedCandidates.length === 0) {
       setError("Select at least one call to import.")
@@ -469,23 +469,43 @@ export function LibraryImportDrawer({
       setError("Base URL is required because calls have no absolute URL.")
       return
     }
-    try {
-      const created = await confirmMutation.mutateAsync(
-        selectedCandidates.map((candidate) => ({
-          key: candidate.key,
-          payload: {
-            ...candidate.payload,
-            name: names[candidate.key]?.trim() || candidate.payload.name,
-          },
-        }))
-      )
-      toast.success(
-        `Imported ${created.length} call${created.length > 1 ? "s" : ""}`
-      )
-      handleOpenChange(false)
-    } catch {
-      // Shown through the mutation error.
-    }
+
+    const items = selectedCandidates.map((candidate) => ({
+      key: candidate.key,
+      payload: {
+        ...candidate.payload,
+        name: names[candidate.key]?.trim() || candidate.payload.name,
+      },
+    }))
+    const count = items.length
+    const progressToast = toast.loading("Importing into your library", {
+      description:
+        count === 1
+          ? "We are creating this call in the background. You can keep using the app — we will let you know when it is ready."
+          : `We are creating ${count} calls in the background. You can keep using the app — we will let you know when they are ready.`,
+    })
+    handleOpenChange(false)
+
+    confirmMutation.mutate(items, {
+      onSuccess: (created) => {
+        toast.dismiss(progressToast)
+        toast.success("Library import finished", {
+          description:
+            created.length === 1
+              ? "Your call is now available in the library. You can drag it onto a workflow canvas or open it to edit."
+              : `All ${created.length} calls are now available in the library. You can drag them onto a workflow canvas or open them to edit.`,
+        })
+      },
+      onError: (err) => {
+        toast.dismiss(progressToast)
+        toast.error("Library import could not be completed", {
+          description:
+            err instanceof Error
+              ? err.message
+              : "We could not add these calls to the library. Please try again, or check that the file and base URL are valid.",
+        })
+      },
+    })
   }
 
   const busy = previewing || confirmMutation.isPending
