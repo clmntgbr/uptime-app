@@ -32,8 +32,8 @@ import { methodClass } from "@/lib/call/method-style"
 import { cn } from "@/lib/utils"
 import { useCurrentWorkflowId } from "@/lib/workflow/current"
 import type { LibraryItemSummary } from "@/lib/library/types"
-import { PlusIcon, SearchIcon, UploadIcon } from "lucide-react"
-import { useEffect, useState } from "react"
+import { Loader2Icon, PlusIcon, SearchIcon, UploadIcon } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
 const SEARCH_DEBOUNCE_MS = 250
@@ -75,11 +75,47 @@ export function LibraryDrawer({ open, onOpenChange }: LibraryDrawerProps) {
     return () => window.clearTimeout(timer)
   }, [search])
 
-  const itemsQuery = useLibraryItems(debouncedSearch, methods)
+  const {
+    data: itemsPages,
+    error: itemsError,
+    isLoading: itemsLoading,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useLibraryItems(debouncedSearch, methods, open)
   const deleteMutation = useDeleteLibraryItem()
   const workflowId = useCurrentWorkflowId()
   const insertMutation = useInsertLibraryItem(workflowId ?? "")
-  const items = itemsQuery.data?.members ?? []
+  const items = useMemo(
+    () => itemsPages?.pages.flatMap((page) => page.members) ?? [],
+    [itemsPages]
+  )
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const root = scrollRef.current
+    const sentinel = sentinelRef.current
+    if (!root || !sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage()
+        }
+      },
+      { root, rootMargin: "200px" }
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [
+    open,
+    items.length,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  ])
 
   const toggleMethod = (method: string) => {
     setMethods((current) =>
@@ -120,7 +156,7 @@ export function LibraryDrawer({ open, onOpenChange }: LibraryDrawerProps) {
           side="left"
           overlay={false}
           showCloseButton
-          className="!inset-y-2 !left-2 !h-auto !w-[22rem] !max-w-[22rem] !rounded-xl border sm:!max-w-[22rem]"
+          className="!inset-y-2 !left-2 !flex !h-[calc(100%-1rem)] !w-[22rem] !max-w-[22rem] !overflow-hidden !rounded-xl border sm:!max-w-[22rem]"
         >
           <SheetHeader className="gap-1 border-b px-4 py-4 pe-12">
             <SheetTitle>Library</SheetTitle>
@@ -187,17 +223,18 @@ export function LibraryDrawer({ open, onOpenChange }: LibraryDrawerProps) {
             ) : null}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-auto px-4 py-4">
-            {itemsQuery.isLoading ? (
+          <div
+            ref={scrollRef}
+            className="min-h-0 flex-1 overflow-auto px-4 py-4"
+          >
+            {itemsLoading ? (
               <div className="flex flex-col gap-2">
                 {Array.from({ length: 4 }).map((_, index) => (
                   <Skeleton key={index} className="h-12 w-full rounded-lg" />
                 ))}
               </div>
-            ) : itemsQuery.error ? (
-              <p className="text-sm text-destructive">
-                {itemsQuery.error.message}
-              </p>
+            ) : itemsError ? (
+              <p className="text-sm text-destructive">{itemsError.message}</p>
             ) : items.length === 0 ? (
               <p className="py-8 text-center text-xs text-muted-foreground">
                 {debouncedSearch
@@ -207,24 +244,32 @@ export function LibraryDrawer({ open, onOpenChange }: LibraryDrawerProps) {
                     : "No library items yet. Create one to reuse it across workflows."}
               </p>
             ) : (
-              <ul className="flex flex-col gap-2">
-                {items.map((item) => (
-                  <li key={item.id}>
-                    <LibraryItemCard
-                      item={item}
-                      onEdit={() => openEdit(item.id)}
-                      onDelete={() => setItemToDelete(item)}
-                      onAddToWorkflow={
-                        workflowId ? () => addToWorkflow(item) : undefined
-                      }
-                      addPending={
-                        insertMutation.isPending &&
-                        insertMutation.variables === item.id
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ul className="flex flex-col gap-2">
+                  {items.map((item) => (
+                    <li key={item.id}>
+                      <LibraryItemCard
+                        item={item}
+                        onEdit={() => openEdit(item.id)}
+                        onDelete={() => setItemToDelete(item)}
+                        onAddToWorkflow={
+                          workflowId ? () => addToWorkflow(item) : undefined
+                        }
+                        addPending={
+                          insertMutation.isPending &&
+                          insertMutation.variables === item.id
+                        }
+                      />
+                    </li>
+                  ))}
+                </ul>
+                <div ref={sentinelRef} className="h-4 w-full" aria-hidden />
+                {isFetchingNextPage ? (
+                  <div className="flex justify-center py-3">
+                    <Loader2Icon className="size-4 animate-spin text-muted-foreground" />
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         </SheetContent>

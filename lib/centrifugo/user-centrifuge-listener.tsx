@@ -8,6 +8,7 @@ import {
   refetchAllWorkflowContext,
   refetchAllWorkflowExpiry,
   refetchAllWorkflowIncidents,
+  refetchLibrary,
   refetchStatistics,
   refetchWorkflowContext,
   refetchWorkflowDetail,
@@ -45,6 +46,11 @@ export function UserCentrifugeListener() {
         if (event.workflowId) {
           refetchWorkflowExpiry(queryClient, event.workflowId, "items")
         }
+        return
+      }
+
+      if (eventTypeEquals(event, "library.imported")) {
+        void refetchLibrary(queryClient)
         return
       }
 
@@ -103,6 +109,7 @@ export function UserCentrifugeListener() {
     void refetchAllWorkflowContext(queryClient)
     void refetchAllWorkflowExpiry(queryClient)
     void refetchAllWorkflowIncidents(queryClient)
+    void refetchLibrary(queryClient)
     void queryClient.invalidateQueries({
       predicate: (query) =>
         query.queryKey[0] === "runs" && query.queryKey[2] === "list",

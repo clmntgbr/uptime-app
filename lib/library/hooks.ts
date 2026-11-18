@@ -1,6 +1,11 @@
 "use client"
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query"
 import { ApiError, formatApiErrorToast } from "@/lib/api-error"
 import { queryKeys } from "@/lib/query/keys"
 import { toast } from "sonner"
@@ -16,17 +21,35 @@ import {
 } from "./api"
 import type { LibraryImportFormat, LibraryItemInput } from "./types"
 
-export function useLibraryItems(search: string, methods: string[]) {
-  return useQuery({
+/** Page size for the library drawer infinite scroll. */
+export const LIBRARY_PAGE_SIZE = 40
+
+export function useLibraryItems(
+  search: string,
+  methods: string[],
+  enabled = true
+) {
+  return useInfiniteQuery({
     queryKey: queryKeys.library.list(search, methods),
-    queryFn: () =>
+    enabled,
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) =>
       listLibraryItems({
         search: search || undefined,
         methods,
         sortBy: "name",
         orderBy: "asc",
-        limit: 200,
+        page: pageParam,
+        limit: LIBRARY_PAGE_SIZE,
       }),
+    getNextPageParam: (lastPage) => {
+      const page = lastPage.page || 1
+      if (lastPage.members.length < LIBRARY_PAGE_SIZE) return undefined
+      if (lastPage.totalPages > 0 && page >= lastPage.totalPages) {
+        return undefined
+      }
+      return page + 1
+    },
   })
 }
 
@@ -102,7 +125,10 @@ export function usePreviewLibraryImport() {
   })
 }
 
-/** Stores the reviewed candidates. Refreshes every library list on success. */
+/**
+ * Stores the reviewed candidates. List refresh comes from `library.imported`
+ * realtime (and a local invalidate so the drawer updates immediately).
+ */
 export function useConfirmLibraryImport() {
   const invalidate = useInvalidateLibrary()
   return useMutation({

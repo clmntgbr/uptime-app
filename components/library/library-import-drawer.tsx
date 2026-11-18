@@ -25,14 +25,13 @@ import { libraryVariables } from "@/lib/library/variables"
 import { useGlobalVariables } from "@/lib/variable/hooks"
 import { cn } from "@/lib/utils"
 import {
-  ArrowDownIcon,
   ArrowLeftIcon,
   FileUpIcon,
   Loader2Icon,
   XIcon,
 } from "lucide-react"
 import { toast } from "sonner"
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 
 /** Same limit as the server: 2 MB of content. */
 const MAX_CONTENT_BYTES = 2 * 1024 * 1024
@@ -97,23 +96,66 @@ function formatLabel(format: LibraryImportFormat) {
   return "cURL"
 }
 
-/**
- * Absolute http(s), or a library variable template (`{{api_base}}`).
- * Rejects `/` and bare relative paths.
- */
-function isUsableBaseUrl(value: string): boolean {
-  const trimmed = value.trim()
-  if (!trimmed || trimmed === "/") return false
-  if (trimmed.startsWith("/") && !trimmed.includes("{{")) return false
-  // OpenAPI server templates like https://{host} are not library variables.
-  if (/\{[^{][^}]*\}/.test(trimmed) && !trimmed.includes("{{")) return false
-  if (/\{\{[A-Za-z_][A-Za-z0-9_]*\}\}/.test(trimmed)) return true
+function isAbsoluteHttpUrl(raw: string): boolean {
   try {
-    const url = new URL(trimmed)
+    const url = new URL(raw.trim())
     return url.protocol === "http:" || url.protocol === "https:"
   } catch {
     return false
   }
+}
+
+/**
+ * Absolute http(s), or a global variable template whose value is an absolute
+ * http(s) URL (e.g. {{api_base}} → https://…). Secret globals are accepted
+ * client-side; the API checks their decrypted value.
+ */
+function isUsableBaseUrl(
+  value: string,
+  globals: { name: string; value: string; secret?: boolean }[] = []
+): boolean {
+  const trimmed = value.trim().replace(/\/+$/, "")
+  if (!trimmed || trimmed === "/") return false
+  if (trimmed.startsWith("/") && !trimmed.includes("{{")) return false
+  // OpenAPI server templates like https://{host} are not library variables.
+  if (/\{[^{][^}]*\}/.test(trimmed) && !trimmed.includes("{{")) return false
+
+  const refs = [
+    ...trimmed.matchAll(/\{\{\s*([A-Za-z_][A-Za-z0-9_-]*)\s*\}\}/g),
+  ].map((match) => match[1])
+  if (refs.length === 0) {
+    return isAbsoluteHttpUrl(trimmed)
+  }
+
+  const byName = new Map(globals.map((global) => [global.name, global]))
+  let resolved = trimmed
+  for (const name of refs) {
+    const global = byName.get(name)
+    if (!global) return false
+    if (global.secret) {
+      resolved = resolved.replaceAll(
+        new RegExp(`\\{\\{\\s*${name}\\s*\\}\\}`, "g"),
+        "https://placeholder.example"
+      )
+      continue
+    }
+    if (!global.value.trim()) return false
+    resolved = resolved.replaceAll(
+      new RegExp(`\\{\\{\\s*${name}\\s*\\}\\}`, "g"),
+      global.value
+    )
+  }
+  return isAbsoluteHttpUrl(resolved)
+}
+
+/** Globals offered for the import base URL: URL-valued, or secret (API checks). */
+function baseUrlVariables(
+  globals: { name: string; value: string; secret?: boolean }[] | undefined
+) {
+  return libraryVariables(globals).filter(
+    (variable) =>
+      variable.secret || isAbsoluteHttpUrl(variable.value ?? "")
+  )
 }
 
 function normalizeBaseUrl(value: string): string {
@@ -228,6 +270,51 @@ function callsNeedBaseUrl(items: LibraryImportCandidate[]): boolean {
   return items.some((item) => callNeedsBaseUrl(item.payload.url ?? ""))
 }
 
+/**
+ * Keep `{{global}}` for known globals; turn unknown `{{id}}` / `{id}`
+ * into `[id]` path placeholders (not Uptime variables).
+ */
+function demoteUnknownVariables(
+  url: string,
+  knownNames: ReadonlySet<string>
+): string {
+  return url
+    .replace(
+      /\{\{\s*([A-Za-z_][A-Za-z0-9_-]*)\s*\}\}/g,
+      (full, name: string) => (knownNames.has(name) ? full : `[${name}]`)
+    )
+    .replace(
+      /(?<!\{)\{([A-Za-z_][A-Za-z0-9_-]*)\}(?!\})/g,
+      (full, name: string) => (knownNames.has(name) ? full : `[${name}]`)
+    )
+}
+
+function sanitizeImportCandidate(
+  candidate: LibraryImportCandidate,
+  knownNames: ReadonlySet<string>
+): LibraryImportCandidate {
+  const url = candidate.payload.url
+  if (!url) return candidate
+  const nextUrl = demoteUnknownVariables(url, knownNames)
+  if (nextUrl === url) return candidate
+  return {
+    ...candidate,
+    payload: { ...candidate.payload, url: nextUrl },
+  }
+}
+
+function sanitizeImportPreview(
+  preview: LibraryImportPreview,
+  knownNames: ReadonlySet<string>
+): LibraryImportPreview {
+  return {
+    ...preview,
+    items: preview.items.map((item) =>
+      sanitizeImportCandidate(item, knownNames)
+    ),
+  }
+}
+
 interface LibraryImportDrawerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -239,7 +326,12 @@ export function LibraryImportDrawer({
 }: LibraryImportDrawerProps) {
   const confirmMutation = useConfirmLibraryImport()
   const globalsQuery = useGlobalVariables()
-  const variables = libraryVariables(globalsQuery.data)
+  const variables = baseUrlVariables(globalsQuery.data)
+  const globals = globalsQuery.data ?? []
+  const knownVariableNames = useMemo(
+    () => new Set(globals.map((global) => global.name)),
+    [globals]
+  )
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [fileName, setFileName] = useState<string | null>(null)
   const [content, setContent] = useState("")
@@ -306,9 +398,13 @@ export function LibraryImportDrawer({
     }
     const needsBase = baseUrlRequired || fileNeedsBaseUrl(content)
     const base = baseUrl.trim()
-    if (needsBase && !isUsableBaseUrl(base)) {
+    if (needsBase && !isUsableBaseUrl(base, globals)) {
       setBaseUrlRequired(true)
-      setError("Base URL is required because calls have no absolute URL.")
+      setError(
+        base
+          ? "Base URL variable must resolve to an absolute http(s) URL."
+          : "Base URL is required because calls have no absolute URL."
+      )
       return
     }
     const order = formatsToTry(format ?? detectFormat(content, fileName ?? ""))
@@ -327,7 +423,8 @@ export function LibraryImportDrawer({
             lastMessage = "No calls found in this file."
             continue
           }
-          if (callsNeedBaseUrl(result.items)) {
+          const sanitized = sanitizeImportPreview(result, knownVariableNames)
+          if (callsNeedBaseUrl(sanitized.items)) {
             setBaseUrlRequired(true)
             setError(
               "Base URL is required because calls have no absolute URL."
@@ -336,13 +433,13 @@ export function LibraryImportDrawer({
           }
           setFormat(candidate)
           setBaseUrlRequired(false)
-          setPreview(result)
+          setPreview(sanitized)
           setSelected(
-            Object.fromEntries(result.items.map((c) => [c.key, true]))
+            Object.fromEntries(sanitized.items.map((c) => [c.key, true]))
           )
           setNames(
             Object.fromEntries(
-              result.items.map((c) => [c.key, c.payload.name])
+              sanitized.items.map((c) => [c.key, c.payload.name])
             )
           )
           return
@@ -499,8 +596,8 @@ export function LibraryImportDrawer({
               </Label>
               <p className="text-xs text-muted-foreground">
                 {baseUrlRequired
-                  ? "Required — this file has no absolute server URL. You can use a global variable, e.g. {{api_base}}."
-                  : "Applied to calls without their own host. Supports global variables, e.g. {{api_base}}."}
+                  ? "Required — this file has no absolute server URL. Use https://… or a global whose value is an absolute URL."
+                  : "Applied to calls without their own host. Use https://… or a global whose value is an absolute URL."}
               </p>
               <VariableInput
                 id="import-base-url"
@@ -549,7 +646,7 @@ export function LibraryImportDrawer({
               disabled={
                 busy ||
                 !content.trim() ||
-                (baseUrlRequired && !isUsableBaseUrl(baseUrl))
+                (baseUrlRequired && !isUsableBaseUrl(baseUrl, globals))
               }
             >
               Preview
@@ -562,6 +659,20 @@ export function LibraryImportDrawer({
       </SheetContent>
     </Sheet>
   )
+}
+
+/** Path-param placeholders are expected — no need to nag in the preview list. */
+function isPathParamWarning(warning: { code: string; message: string }): boolean {
+  return (
+    warning.code === "variable_to_define" &&
+    /Provide the value of \{\{.+?\}\} in the workflow/i.test(warning.message)
+  )
+}
+
+function visibleWarnings(
+  warnings: LibraryImportCandidate["warnings"]
+): LibraryImportCandidate["warnings"] {
+  return warnings.filter((warning) => !isPathParamWarning(warning))
 }
 
 function ReviewStep({
@@ -608,30 +719,13 @@ function ReviewStep({
         </div>
       </div>
 
-      <ul className="min-h-0 flex-1 overflow-auto px-6 py-4">
-        {preview.items.map((candidate, index) => {
+      <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-auto px-6 py-4">
+        {preview.items.map((candidate) => {
           const method = (candidate.payload.method ?? "GET").toUpperCase()
           const isSelected = !!selected[candidate.key]
+          const warnings = visibleWarnings(candidate.warnings)
           return (
-            <li
-              key={candidate.key}
-              className="relative"
-              style={index > 0 ? { paddingTop: 22 } : undefined}
-            >
-              {index > 0 ? (
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 top-0 flex h-[22px] justify-center ps-7 text-muted-foreground/45"
-                >
-                  <div className="flex flex-col items-center">
-                    <span className="w-px flex-1 bg-current" />
-                    <ArrowDownIcon
-                      className="size-3 shrink-0"
-                      strokeWidth={2.25}
-                    />
-                  </div>
-                </div>
-              ) : null}
+            <li key={candidate.key}>
               <div className="flex items-center gap-2">
                 <Checkbox
                   checked={isSelected}
@@ -672,9 +766,9 @@ function ReviewStep({
                   </div>
                 </div>
               </div>
-              {candidate.warnings.length > 0 ? (
+              {warnings.length > 0 ? (
                 <ul className="mt-1.5 space-y-0.5 ps-9">
-                  {candidate.warnings.map((warning, warningIndex) => (
+                  {warnings.map((warning, warningIndex) => (
                     <li
                       key={`${warning.code}-${warningIndex}`}
                       className={cn(

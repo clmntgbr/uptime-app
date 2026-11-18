@@ -1,6 +1,7 @@
 "use client"
 
 import { methodClass } from "@/lib/call/method-style"
+import { VariableText } from "@/components/variable/variable-text"
 import { LIBRARY_ITEM_MIME, type LibraryItemSummary } from "@/lib/library/types"
 import { cn } from "@/lib/utils"
 import { PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
@@ -52,7 +53,7 @@ export function LibraryItemCard({
             {item.name}
           </p>
           <p className="truncate text-[11px] text-muted-foreground">
-            {item.url || "—"}
+            <VariableText text={item.url || "—"} />
           </p>
         </div>
       </div>

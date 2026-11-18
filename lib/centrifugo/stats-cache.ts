@@ -196,3 +196,8 @@ export function refetchAllWorkflowIncidents(queryClient: QueryClient) {
       query.queryKey[2] === "incidents",
   })
 }
+
+/** Reset every library list (infinite pages included) after import / reconnect. */
+export function refetchLibrary(queryClient: QueryClient) {
+  return queryClient.invalidateQueries({ queryKey: queryKeys.library.all })
+}
