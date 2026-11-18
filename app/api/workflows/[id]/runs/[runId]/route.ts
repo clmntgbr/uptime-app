@@ -30,6 +30,9 @@ export async function GET(_request: Request, context: RouteContext) {
     const data = await response.json()
     return NextResponse.json(data)
   } catch {
-    return NextResponse.json({ success: false }, { status: 500 })
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    )
   }
 }

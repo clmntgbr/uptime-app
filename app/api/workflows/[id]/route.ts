@@ -27,7 +27,10 @@ export async function GET(_request: Request, context: RouteContext) {
     const data = await response.json()
     return NextResponse.json(data)
   } catch {
-    return NextResponse.json({ success: false }, { status: 500 })
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    )
   }
 }
 
@@ -51,7 +54,10 @@ export async function PUT(request: Request, context: RouteContext) {
     const data = await response.json()
     return NextResponse.json(data)
   } catch {
-    return NextResponse.json({ success: false }, { status: 500 })
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    )
   }
 }
 
@@ -72,6 +78,9 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
     return new NextResponse(null, { status: 204 })
   } catch {
-    return NextResponse.json({ success: false }, { status: 500 })
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    )
   }
 }

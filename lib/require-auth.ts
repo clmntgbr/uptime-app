@@ -8,7 +8,7 @@ export async function requireAuth(): Promise<
   if (!userId) {
     return {
       error: NextResponse.json(
-        { success: false, error: "Unauthorized" },
+        { message: "Unauthorized" },
         { status: 401 }
       ),
     }
@@ -18,7 +18,7 @@ export async function requireAuth(): Promise<
   if (!clerkToken) {
     return {
       error: NextResponse.json(
-        { success: false, error: "Missing Clerk token" },
+        { message: "Missing Clerk token" },
         { status: 401 }
       ),
     }

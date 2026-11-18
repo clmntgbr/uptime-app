@@ -91,7 +91,7 @@ export function formatApiErrorToast(error: ApiError): {
   }
 }
 
-/** Reads `{ data: { message, code, data, errors } }` produced by `proxyBackendError`. */
+/** Reads the API error envelope `{ message, errors?, code?, data? }`. */
 export async function parseApiError(
   response: Response,
   fallbackMessage: string
@@ -101,8 +101,7 @@ export async function parseApiError(
   let data: unknown
 
   try {
-    const body = await response.json()
-    const payload = body?.data ?? body
+    const payload = await response.json()
     const candidate = payload?.message
     if (typeof candidate === "string" && candidate.trim()) {
       message = candidate

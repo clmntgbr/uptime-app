@@ -1,4 +1,5 @@
 import { createAuthHeaders } from "@/lib/create-auth-headers"
+import { proxyBackendError } from "@/lib/proxy-backend-error"
 import { requireAuth } from "@/lib/require-auth"
 import { NextResponse } from "next/server"
 
@@ -15,12 +16,15 @@ export async function GET() {
     })
 
     if (!response.ok) {
-      return NextResponse.json({ success: false }, { status: response.status })
+      return proxyBackendError(response)
     }
 
     const data = await response.json()
     return NextResponse.json(data)
   } catch {
-    return NextResponse.json({ success: false }, { status: 500 })
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    )
   }
 }

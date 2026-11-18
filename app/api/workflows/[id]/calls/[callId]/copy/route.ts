@@ -30,6 +30,9 @@ export async function POST(_request: Request, context: RouteContext) {
     const data = await response.json()
     return NextResponse.json(data, { status: response.status })
   } catch {
-    return NextResponse.json({ success: false }, { status: 500 })
+    return NextResponse.json(
+      { message: "Internal server error" },
+      { status: 500 }
+    )
   }
 }

@@ -2,24 +2,31 @@ import { NextResponse } from "next/server"
 
 /**
  * Forward a non-OK backend response to the browser with its body (when present).
- * Safe when the body is empty or not JSON — avoids turning real 4xx into 500.
+ * Preserves the API error envelope `{ message, errors?, code? }` — never wraps in
+ * `{ success, data }`. Safe when the body is empty or not JSON.
  */
 export async function proxyBackendError(
   response: Response
 ): Promise<NextResponse> {
   const text = await response.text()
-  let data: unknown = null
 
   if (text) {
     try {
-      data = JSON.parse(text)
+      const data = JSON.parse(text)
+      if (data !== null && typeof data === "object" && !Array.isArray(data)) {
+        return NextResponse.json(data, { status: response.status })
+      }
     } catch {
-      data = { message: text }
+      // Not JSON — fall through to a plain message envelope.
     }
+    return NextResponse.json(
+      { message: text },
+      { status: response.status }
+    )
   }
 
   return NextResponse.json(
-    { success: false, data },
+    { message: "Request failed" },
     { status: response.status }
   )
 }

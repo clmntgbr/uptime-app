@@ -5,54 +5,227 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Textarea } from "@/components/ui/textarea"
+import { VariableInput } from "@/components/variable/variable-input"
+import { VariableText } from "@/components/variable/variable-text"
 import { methodClass } from "@/lib/call/method-style"
-import {
-  useConfirmLibraryImport,
-  usePreviewLibraryImport,
-} from "@/lib/library/hooks"
+import { previewLibraryImport } from "@/lib/library/api"
+import { useConfirmLibraryImport } from "@/lib/library/hooks"
 import type {
   LibraryImportCandidate,
   LibraryImportFormat,
   LibraryImportPreview,
 } from "@/lib/library/types"
+import { libraryVariables } from "@/lib/library/variables"
+import { useGlobalVariables } from "@/lib/variable/hooks"
 import { cn } from "@/lib/utils"
-import { ArrowLeftIcon, Loader2Icon, UploadIcon } from "lucide-react"
+import {
+  ArrowDownIcon,
+  ArrowLeftIcon,
+  FileUpIcon,
+  Loader2Icon,
+  XIcon,
+} from "lucide-react"
 import { toast } from "sonner"
-import { useState } from "react"
+import { useRef, useState } from "react"
 
-/** Same limits as the server: 2 MB of content, 500 items per confirmation. */
+/** Same limit as the server: 2 MB of content. */
 const MAX_CONTENT_BYTES = 2 * 1024 * 1024
-const MAX_IMPORT_ITEMS = 500
 
-const FORMATS: { value: LibraryImportFormat; label: string }[] = [
-  { value: "openapi", label: "OpenAPI 3 (JSON / YAML)" },
-  { value: "postman", label: "Postman collection v2.1" },
-  { value: "curl", label: "cURL command(s)" },
-]
+const IMPORT_FORMATS: LibraryImportFormat[] = ["openapi", "postman", "curl"]
 
-/** Best guess from the pasted text; the user can always change it. */
-function detectFormat(content: string): LibraryImportFormat | null {
-  const text = content.trimStart()
-  if (/^curl\s/i.test(text)) return "curl"
-  if (/"_postman_id"|getpostman\.com\/json\/collection|"item"\s*:/.test(text)) {
+/**
+ * Infer format from contents and filename. Minified OpenAPI/Postman often
+ * has keys mid-line, so we avoid line-anchored checks.
+ */
+function detectFormat(
+  content: string,
+  fileName = ""
+): LibraryImportFormat | null {
+  const text = content.replace(/^\uFEFF/, "").trimStart()
+  const name = fileName.toLowerCase()
+
+  if (/^curl\b/i.test(text) || /(?:^|[\n;&|])\s*curl\s+/i.test(text)) {
+    return "curl"
+  }
+
+  if (
+    /"_postman_id"\s*:/i.test(text) ||
+    /getpostman\.com\/json\/collection/i.test(text) ||
+    /schema\.getpostman\.com/i.test(text) ||
+    (/"item"\s*:/.test(text) &&
+      /"info"\s*:/.test(text) &&
+      /"schema"\s*:/.test(text))
+  ) {
     return "postman"
   }
-  if (/^\s*"?openapi"?\s*:/m.test(text)) return "openapi"
+
+  if (
+    /["']?openapi["']?\s*:/i.test(text) ||
+    /["']?swagger["']?\s*:\s*["']?2(\.0)?["']?/i.test(text) ||
+    (/"paths"\s*:/.test(text) &&
+      (/"info"\s*:/.test(text) || /"components"\s*:/.test(text)))
+  ) {
+    return "openapi"
+  }
+
+  if (/postman|collection/i.test(name) && name.endsWith(".json")) {
+    return "postman"
+  }
+  if (/openapi|swagger/i.test(name) || /\.(ya?ml)$/i.test(name)) {
+    return "openapi"
+  }
+  if (/\.(sh|curl)$/i.test(name)) return "curl"
+
   return null
+}
+
+/** Prefer a guess, then fall back through every supported format. */
+function formatsToTry(preferred: LibraryImportFormat | null): LibraryImportFormat[] {
+  if (!preferred) return [...IMPORT_FORMATS]
+  return [preferred, ...IMPORT_FORMATS.filter((format) => format !== preferred)]
+}
+
+function formatLabel(format: LibraryImportFormat) {
+  if (format === "openapi") return "OpenAPI 3"
+  if (format === "postman") return "Postman collection"
+  return "cURL"
+}
+
+/**
+ * Absolute http(s), or a library variable template (`{{api_base}}`).
+ * Rejects `/` and bare relative paths.
+ */
+function isUsableBaseUrl(value: string): boolean {
+  const trimmed = value.trim()
+  if (!trimmed || trimmed === "/") return false
+  if (trimmed.startsWith("/") && !trimmed.includes("{{")) return false
+  // OpenAPI server templates like https://{host} are not library variables.
+  if (/\{[^{][^}]*\}/.test(trimmed) && !trimmed.includes("{{")) return false
+  if (/\{\{[A-Za-z_][A-Za-z0-9_]*\}\}/.test(trimmed)) return true
+  try {
+    const url = new URL(trimmed)
+    return url.protocol === "http:" || url.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
+function normalizeBaseUrl(value: string): string {
+  return value.trim().replace(/\/+$/, "")
+}
+
+/** Pull a usable server/base URL from OpenAPI, Swagger 2, or Postman JSON. */
+function extractBaseUrl(content: string): string | null {
+  try {
+    const doc = JSON.parse(content) as Record<string, unknown>
+
+    if (Array.isArray(doc.servers)) {
+      for (const server of doc.servers) {
+        if (!server || typeof server !== "object") continue
+        const url = (server as { url?: unknown }).url
+        if (typeof url === "string" && isUsableBaseUrl(url)) {
+          return normalizeBaseUrl(url)
+        }
+      }
+    }
+
+    if (typeof doc.host === "string" && doc.host.trim()) {
+      const schemes = Array.isArray(doc.schemes) ? doc.schemes : []
+      const scheme =
+        typeof schemes[0] === "string" && schemes[0]
+          ? schemes[0]
+          : "https"
+      const basePath =
+        typeof doc.basePath === "string" && doc.basePath !== "/"
+          ? doc.basePath
+          : ""
+      const built = `${scheme}://${doc.host}${basePath}`
+      if (isUsableBaseUrl(built)) return normalizeBaseUrl(built)
+    }
+
+    const variables = Array.isArray(doc.variable) ? doc.variable : []
+    for (const variable of variables) {
+      if (!variable || typeof variable !== "object") continue
+      const entry = variable as { key?: unknown; value?: unknown }
+      if (
+        typeof entry.key === "string" &&
+        /^(baseUrl|base_url|host|url)$/i.test(entry.key) &&
+        typeof entry.value === "string" &&
+        isUsableBaseUrl(entry.value)
+      ) {
+        return normalizeBaseUrl(entry.value)
+      }
+    }
+  } catch {
+    // YAML / non-JSON: take the first absolute server url if present.
+    const yamlMatch = content.match(
+      /(?:^|\n)\s*-\s*url:\s*["']?(https?:\/\/[^\s"'#]+)/i
+    )
+    if (yamlMatch?.[1] && isUsableBaseUrl(yamlMatch[1])) {
+      return normalizeBaseUrl(yamlMatch[1])
+    }
+  }
+
+  return null
+}
+
+/** True when the document has no absolute server/host of its own. */
+function fileNeedsBaseUrl(content: string): boolean {
+  if (extractBaseUrl(content)) return false
+
+  try {
+    const doc = JSON.parse(content) as Record<string, unknown>
+    const isOpenApi =
+      typeof doc.openapi === "string" ||
+      typeof doc.swagger === "string" ||
+      (doc.paths != null && typeof doc.paths === "object")
+
+    if (!isOpenApi) return false
+
+    if (Array.isArray(doc.servers) && doc.servers.length > 0) {
+      return !doc.servers.some(
+        (server) =>
+          server &&
+          typeof server === "object" &&
+          typeof (server as { url?: unknown }).url === "string" &&
+          isUsableBaseUrl((server as { url: string }).url)
+      )
+    }
+
+    return true
+  } catch {
+    if (
+      /^\s*openapi\s*:/m.test(content) ||
+      /^\s*swagger\s*:/m.test(content)
+    ) {
+      return !/(?:^|\n)\s*-\s*url:\s*["']?https?:\/\//i.test(content)
+    }
+  }
+
+  return false
+}
+
+/**
+ * True when the call URL has no host of its own (path-only or {{base_url}}).
+ * Path params like {{id}} do not make a base URL required.
+ */
+function callNeedsBaseUrl(url: string): boolean {
+  const trimmed = url.trim()
+  return (
+    trimmed === "" ||
+    trimmed.startsWith("{{base_url}}") ||
+    trimmed.startsWith("/")
+  )
+}
+
+function callsNeedBaseUrl(items: LibraryImportCandidate[]): boolean {
+  return items.some((item) => callNeedsBaseUrl(item.payload.url ?? ""))
 }
 
 interface LibraryImportDrawerProps {
@@ -64,24 +237,32 @@ export function LibraryImportDrawer({
   open,
   onOpenChange,
 }: LibraryImportDrawerProps) {
-  const previewMutation = usePreviewLibraryImport()
   const confirmMutation = useConfirmLibraryImport()
-  const [format, setFormat] = useState<LibraryImportFormat>("openapi")
+  const globalsQuery = useGlobalVariables()
+  const variables = libraryVariables(globalsQuery.data)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [fileName, setFileName] = useState<string | null>(null)
   const [content, setContent] = useState("")
+  const [format, setFormat] = useState<LibraryImportFormat | null>(null)
   const [baseUrl, setBaseUrl] = useState("")
+  const [baseUrlRequired, setBaseUrlRequired] = useState(false)
   const [preview, setPreview] = useState<LibraryImportPreview | null>(null)
   const [selected, setSelected] = useState<Record<string, boolean>>({})
   const [names, setNames] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
+  const [previewing, setPreviewing] = useState(false)
 
   const reset = () => {
+    setFileName(null)
     setContent("")
+    setFormat(null)
     setBaseUrl("")
+    setBaseUrlRequired(false)
     setPreview(null)
     setSelected({})
     setNames({})
     setError(null)
-    previewMutation.reset()
+    if (fileInputRef.current) fileInputRef.current.value = ""
     confirmMutation.reset()
   }
 
@@ -90,10 +271,14 @@ export function LibraryImportDrawer({
     onOpenChange(next)
   }
 
-  const applyContent = (text: string) => {
-    setContent(text)
-    const detected = detectFormat(text)
-    if (detected) setFormat(detected)
+  const clearFile = () => {
+    setFileName(null)
+    setContent("")
+    setFormat(null)
+    setBaseUrl("")
+    setBaseUrlRequired(false)
+    setError(null)
+    if (fileInputRef.current) fileInputRef.current.value = ""
   }
 
   const onFile = async (file: File | undefined) => {
@@ -102,29 +287,73 @@ export function LibraryImportDrawer({
       setError("This file is larger than 2 MB.")
       return
     }
+    const text = await file.text()
+    const extracted = extractBaseUrl(text)
+    const needsBase = fileNeedsBaseUrl(text)
     setError(null)
-    applyContent(await file.text())
+    setFileName(file.name)
+    setContent(text)
+    setFormat(detectFormat(text, file.name))
+    setBaseUrl(extracted ?? "")
+    setBaseUrlRequired(needsBase)
   }
 
   const runPreview = async () => {
     setError(null)
     if (!content.trim()) {
-      setError("Paste a document or choose a file first.")
+      setError("Choose a file to import first.")
       return
     }
+    const needsBase = baseUrlRequired || fileNeedsBaseUrl(content)
+    const base = baseUrl.trim()
+    if (needsBase && !isUsableBaseUrl(base)) {
+      setBaseUrlRequired(true)
+      setError("Base URL is required because calls have no absolute URL.")
+      return
+    }
+    const order = formatsToTry(format ?? detectFormat(content, fileName ?? ""))
+    let lastMessage: string | null = null
+    setPreviewing(true)
     try {
-      const result = await previewMutation.mutateAsync({
-        format,
-        content,
-        baseUrl: baseUrl.trim() || undefined,
-      })
-      setPreview(result)
-      setSelected(Object.fromEntries(result.items.map((c) => [c.key, true])))
-      setNames(
-        Object.fromEntries(result.items.map((c) => [c.key, c.payload.name]))
-      )
-    } catch {
-      // Shown through the mutation error.
+      for (const candidate of order) {
+        try {
+          const result = await previewLibraryImport({
+            format: candidate,
+            content,
+            baseUrl: base || undefined,
+          })
+          if (result.items.length === 0 && order.indexOf(candidate) < order.length - 1) {
+            // Empty parse — try the next format before giving up.
+            lastMessage = "No calls found in this file."
+            continue
+          }
+          if (callsNeedBaseUrl(result.items)) {
+            setBaseUrlRequired(true)
+            setError(
+              "Base URL is required because calls have no absolute URL."
+            )
+            return
+          }
+          setFormat(candidate)
+          setBaseUrlRequired(false)
+          setPreview(result)
+          setSelected(
+            Object.fromEntries(result.items.map((c) => [c.key, true]))
+          )
+          setNames(
+            Object.fromEntries(
+              result.items.map((c) => [c.key, c.payload.name])
+            )
+          )
+          return
+        } catch (err) {
+          lastMessage =
+            err instanceof Error ? err.message : "Failed to preview import"
+        }
+      }
+      setError(lastMessage ?? "Could not import this file.")
+    } finally {
+      setPreviewing(false)
     }
   }
 
@@ -137,8 +366,10 @@ export function LibraryImportDrawer({
       setError("Select at least one call to import.")
       return
     }
-    if (selectedCandidates.length > MAX_IMPORT_ITEMS) {
-      setError(`Import at most ${MAX_IMPORT_ITEMS} calls at once.`)
+    if (callsNeedBaseUrl(selectedCandidates)) {
+      setBaseUrlRequired(true)
+      setPreview(null)
+      setError("Base URL is required because calls have no absolute URL.")
       return
     }
     try {
@@ -160,12 +391,8 @@ export function LibraryImportDrawer({
     }
   }
 
-  const busy = previewMutation.isPending || confirmMutation.isPending
-  const message =
-    error ??
-    previewMutation.error?.message ??
-    confirmMutation.error?.message ??
-    null
+  const busy = previewing || confirmMutation.isPending
+  const message = error ?? confirmMutation.error?.message ?? null
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
@@ -179,7 +406,7 @@ export function LibraryImportDrawer({
           <SheetDescription>
             {preview
               ? "Review the calls found, then import the selected ones."
-              : "Paste or upload an OpenAPI document, a Postman collection, or cURL commands."}
+              : "Upload an OpenAPI, Postman, or cURL file. Format is detected automatically."}
           </SheetDescription>
         </SheetHeader>
 
@@ -202,69 +429,91 @@ export function LibraryImportDrawer({
           />
         ) : (
           <div className="min-h-0 flex-1 space-y-6 overflow-auto px-6 py-6">
-            <div className="grid gap-6 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="import-format">Format</Label>
-                <Select
-                  value={format}
-                  onValueChange={(value) =>
-                    setFormat(value as LibraryImportFormat)
-                  }
+            <div className="space-y-2">
+              <Label htmlFor="import-file">Import file</Label>
+              <p className="text-xs text-muted-foreground">
+                OpenAPI 3 (JSON / YAML), Postman collection v2.1, or cURL
+                commands. Max 2 MB.
+              </p>
+              <input
+                ref={fileInputRef}
+                id="import-file"
+                type="file"
+                accept=".json,.yaml,.yml,.txt,.sh"
+                className="sr-only"
+                onChange={(event) => {
+                  void onFile(event.target.files?.[0])
+                }}
+              />
+              {fileName ? (
+                <div className="flex h-24 w-full items-center gap-3 rounded-lg border bg-background px-4">
+                  <FileUpIcon className="size-6 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{fileName}</p>
+                    {format ? (
+                      <p className="text-xs text-muted-foreground">
+                        Detected as {formatLabel(format)}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Format will be detected on preview
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label="Remove file"
+                    onClick={clearFile}
+                  >
+                    <XIcon className="size-4" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed bg-background px-4 text-center transition-colors hover:bg-muted/40"
+                  onClick={() => fileInputRef.current?.click()}
                 >
-                  <SelectTrigger id="import-format" className="h-9 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FORMATS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="import-base-url">Base URL (optional)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Applied to calls without their own host, e.g.{" "}
-                  https://api.example.com/v1
-                </p>
-                <Input
-                  id="import-base-url"
-                  value={baseUrl}
-                  onChange={(event) => setBaseUrl(event.target.value)}
-                  placeholder="https://api.example.com"
-                  className="h-9"
-                />
-              </div>
+                  <FileUpIcon className="size-6 text-muted-foreground" />
+                  <span className="text-sm font-medium">Choose a file</span>
+                  <span className="text-xs text-muted-foreground">
+                    .json, .yaml, .yml, .txt, .sh
+                  </span>
+                </button>
+              )}
             </div>
 
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="import-content">Content</Label>
-                <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-                  <UploadIcon className="size-3.5" />
-                  Choose a file
-                  <input
-                    type="file"
-                    accept=".json,.yaml,.yml,.txt,.sh"
-                    className="sr-only"
-                    onChange={(event) => {
-                      void onFile(event.target.files?.[0])
-                      event.target.value = ""
-                    }}
-                  />
-                </label>
-              </div>
-              <Textarea
-                id="import-content"
-                value={content}
-                onChange={(event) => applyContent(event.target.value)}
-                placeholder={
-                  "curl https://api.example.com/health\n\nor the content of an openapi.yaml / collection.json"
-                }
-                rows={16}
-                className="font-mono text-xs"
+              <Label htmlFor="import-base-url">
+                Base URL
+                {baseUrlRequired ? (
+                  <span className="text-destructive"> *</span>
+                ) : (
+                  <span className="font-normal text-muted-foreground">
+                    {" "}
+                    (optional)
+                  </span>
+                )}
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {baseUrlRequired
+                  ? "Required — this file has no absolute server URL. You can use a global variable, e.g. {{api_base}}."
+                  : "Applied to calls without their own host. Supports global variables, e.g. {{api_base}}."}
+              </p>
+              <VariableInput
+                id="import-base-url"
+                value={baseUrl}
+                onChange={(value) => {
+                  setBaseUrl(value)
+                  if (error) setError(null)
+                }}
+                variables={variables}
+                placeholder="https://api.example.com or {{api_base}}"
+                required={baseUrlRequired}
+                aria-required={baseUrlRequired}
+                className="h-9 bg-background dark:bg-background"
               />
             </div>
           </div>
@@ -295,9 +544,16 @@ export function LibraryImportDrawer({
               ) : null}
             </Button>
           ) : (
-            <Button onClick={runPreview} disabled={busy}>
+            <Button
+              onClick={runPreview}
+              disabled={
+                busy ||
+                !content.trim() ||
+                (baseUrlRequired && !isUsableBaseUrl(baseUrl))
+              }
+            >
               Preview
-              {previewMutation.isPending ? (
+              {previewing ? (
                 <Loader2Icon className="size-4 animate-spin" />
               ) : null}
             </Button>
@@ -352,67 +608,87 @@ function ReviewStep({
         </div>
       </div>
 
-      <ul className="min-h-0 flex-1 divide-y overflow-auto">
-        {preview.items.map((candidate) => {
+      <ul className="min-h-0 flex-1 overflow-auto px-6 py-4">
+        {preview.items.map((candidate, index) => {
           const method = (candidate.payload.method ?? "GET").toUpperCase()
           const isSelected = !!selected[candidate.key]
           return (
             <li
               key={candidate.key}
-              className={cn(
-                "flex gap-3 px-6 py-3",
-                !isSelected && "opacity-60"
-              )}
+              className="relative"
+              style={index > 0 ? { paddingTop: 22 } : undefined}
             >
-              <Checkbox
-                checked={isSelected}
-                onCheckedChange={(value) =>
-                  onToggle(candidate.key, value === true)
-                }
-                aria-label={`Import ${candidate.payload.name}`}
-                className="mt-2"
-              />
-              <div className="min-w-0 flex-1 space-y-1.5">
-                <div className="flex items-center gap-2">
+              {index > 0 ? (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 top-0 flex h-[22px] justify-center ps-7 text-muted-foreground/45"
+                >
+                  <div className="flex flex-col items-center">
+                    <span className="w-px flex-1 bg-current" />
+                    <ArrowDownIcon
+                      className="size-3 shrink-0"
+                      strokeWidth={2.25}
+                    />
+                  </div>
+                </div>
+              ) : null}
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={(value) =>
+                    onToggle(candidate.key, value === true)
+                  }
+                  aria-label={`Import ${candidate.payload.name}`}
+                  className="shrink-0"
+                />
+                <div
+                  className={cn(
+                    "flex min-w-0 flex-1 items-center gap-2 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium shadow-sm transition-opacity",
+                    !isSelected && "opacity-45"
+                  )}
+                >
                   <span
+                    title={method}
                     className={cn(
-                      "inline-flex h-5 w-11 shrink-0 items-center justify-center rounded font-mono text-[10px] font-semibold",
+                      "inline-flex h-5 w-9 shrink-0 items-center justify-center rounded-md font-mono text-[9px] font-semibold",
                       methodClass(method)
                     )}
                   >
                     {method}
                   </span>
-                  <Input
-                    aria-label="Name"
-                    value={names[candidate.key] ?? ""}
-                    onChange={(event) =>
-                      onRename(candidate.key, event.target.value)
-                    }
-                    maxLength={100}
-                    className="h-7 text-xs"
-                  />
+                  <div className="min-w-0 flex-1 overflow-hidden">
+                    <Input
+                      aria-label="Name"
+                      value={names[candidate.key] ?? ""}
+                      onChange={(event) =>
+                        onRename(candidate.key, event.target.value)
+                      }
+                      maxLength={100}
+                      className="h-5 border-0 bg-transparent px-0 text-xs font-medium shadow-none focus-visible:ring-0 dark:bg-transparent"
+                    />
+                    <span className="block truncate text-[11px] font-normal text-muted-foreground">
+                      <VariableText text={candidate.payload.url || "—"} />
+                    </span>
+                  </div>
                 </div>
-                <p className="truncate text-[11px] text-muted-foreground">
-                  {candidate.payload.url || "—"}
-                </p>
-                {candidate.warnings.length > 0 ? (
-                  <ul className="space-y-0.5">
-                    {candidate.warnings.map((warning, index) => (
-                      <li
-                        key={`${warning.code}-${index}`}
-                        className={cn(
-                          "text-[11px]",
-                          warning.code === "sensitive_header"
-                            ? "text-amber-700 dark:text-amber-400"
-                            : "text-muted-foreground"
-                        )}
-                      >
-                        {warning.message}
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
               </div>
+              {candidate.warnings.length > 0 ? (
+                <ul className="mt-1.5 space-y-0.5 ps-9">
+                  {candidate.warnings.map((warning, warningIndex) => (
+                    <li
+                      key={`${warning.code}-${warningIndex}`}
+                      className={cn(
+                        "text-[11px]",
+                        warning.code === "sensitive_header"
+                          ? "text-amber-700 dark:text-amber-400"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {warning.message}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </li>
           )
         })}
