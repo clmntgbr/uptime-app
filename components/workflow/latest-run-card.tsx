@@ -62,13 +62,10 @@ function CallCascadeRow({
           {rightLabel}
         </span>
       </div>
-      <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+      <div className="relative h-2 w-full overflow-hidden bg-muted">
         <span
           aria-hidden
-          className={cn(
-            "absolute inset-y-0 rounded-full",
-            callBarClass(call.status)
-          )}
+          className={cn("absolute inset-y-0", callBarClass(call.status))}
           style={{ left: bar.left, width: bar.width }}
         />
       </div>
