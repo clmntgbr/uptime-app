@@ -5,11 +5,13 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useCallback, useRef } from "react"
 import {
   applyWorkflowStarted,
+  applyWorkflowStopped,
   refetchAllWorkflowContext,
   refetchAllWorkflowExpiry,
   refetchAllWorkflowIncidents,
   refetchLibrary,
   refetchStatistics,
+  refetchWorkflowCalls,
   refetchWorkflowContext,
   refetchWorkflowDetail,
   refetchWorkflowExpiry,
@@ -91,14 +93,17 @@ export function UserCentrifugeListener() {
         return
       }
 
-      // workflow.finished — stats + runs + context + expiry items.
+      // workflow.finished — stats, last run, incidents, canvas status + sparkline.
       if (startedTimeoutRef.current) clearTimeout(startedTimeoutRef.current)
+      applyWorkflowStopped(queryClient, event.workflowId)
       void refetchStatistics(queryClient)
       if (event.workflowId) {
         void refetchWorkflowDetail(queryClient, event.workflowId)
         void refetchWorkflowRuns(queryClient, event.workflowId)
+        void refetchWorkflowCalls(queryClient, event.workflowId)
         refetchWorkflowContext(queryClient, event.workflowId)
         refetchWorkflowExpiry(queryClient, event.workflowId, "items")
+        refetchWorkflowIncidents(queryClient, event.workflowId)
       }
     },
     [queryClient]

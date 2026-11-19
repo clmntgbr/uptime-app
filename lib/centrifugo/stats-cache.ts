@@ -94,6 +94,16 @@ export function refetchWorkflowRuns(
   })
 }
 
+/** Calls list — canvas pastilles (lastStatus) + latency sparklines (recentRuns). */
+export function refetchWorkflowCalls(
+  queryClient: QueryClient,
+  workflowId: string
+) {
+  return queryClient.invalidateQueries({
+    queryKey: queryKeys.calls.list(workflowId),
+  })
+}
+
 const CONTEXT_DEBOUNCE_MS = 500
 const contextTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
