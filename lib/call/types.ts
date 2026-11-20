@@ -51,6 +51,8 @@ export interface CallInput {
   headers?: Record<string, string>
   query?: Record<string, string>
   body?: string
+  /** Reference payload; sent back on save so an edit never clears it. */
+  bodyExample?: string
   timeoutMs?: number
   verifyTls?: boolean
   ipVersion?: CallIpVersion
@@ -89,6 +91,8 @@ export interface Call {
   lastHttpStatus?: number
   lastFinishedAt?: string
   lastLatencyMs?: number
+  /** Set on create/update responses; absent from list rows. */
+  bodyExample?: string
   /** Last runs for this call, oldest first (max 24). */
   recentRuns?: CallRecentRun[]
 }
@@ -100,6 +104,7 @@ export interface CallDetail extends Call {
   headers: Record<string, string>
   query: Record<string, string>
   body: string
+  bodyExample: string
   timeoutMs: number
   verifyTls: boolean
   ipVersion: CallIpVersion

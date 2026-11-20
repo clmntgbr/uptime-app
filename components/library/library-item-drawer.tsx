@@ -1,5 +1,6 @@
 "use client"
 
+import { BodyExampleHover } from "@/components/call/body-example-hover"
 import { JsonBodyInput } from "@/components/call/json-body-input"
 import {
   fromRecord,
@@ -237,6 +238,7 @@ function LibraryItemForm({
   )
   const [proxyUrl, setProxyUrl] = useState(item?.proxyUrl ?? "")
   const [body, setBody] = useState(item?.body ?? "")
+  const bodyExample = item?.bodyExample ?? ""
   const [headers, setHeaders] = useState<KeyValuePair[]>(
     item ? fromRecord(item.headers) : DEFAULT_HEADERS
   )
@@ -256,6 +258,7 @@ function LibraryItemForm({
         ipVersion: ipVersion ?? "any",
         proxyUrl: proxyUrl.trim() || undefined,
         body: body || undefined,
+        bodyExample: bodyExample || undefined,
         headers: toRecord(headers),
         query: toRecord(query),
         // Alert rules are not editable here yet; send them back unchanged.
@@ -385,9 +388,11 @@ function LibraryItemForm({
             <div className="space-y-2">
               <div className="space-y-1">
                 <Label>Body</Label>
-                <p className="text-xs text-muted-foreground">
-                  Optional JSON request body
-                </p>
+                <BodyExampleHover
+                  label="Optional JSON request body"
+                  example={bodyExample}
+                  onUse={setBody}
+                />
               </div>
               <JsonBodyInput
                 value={body}

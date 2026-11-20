@@ -149,6 +149,7 @@ export function JsonBodyInput({
   className,
   editorClassName,
   variables = [],
+  readOnly = false,
 }: {
   value: string
   onChange: (value: string) => void
@@ -156,6 +157,8 @@ export function JsonBodyInput({
   className?: string
   editorClassName?: string
   variables?: AvailableVariable[]
+  /** Display only: no editing, no formatting, no variable suggestions. */
+  readOnly?: boolean
 }) {
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const highlightedRef = useRef<HTMLPreElement | null>(null)
@@ -181,6 +184,7 @@ export function JsonBodyInput({
   }, [])
 
   const handleChange = (text: string) => {
+    if (readOnly) return
     onChange(text)
     validate(text)
   }
@@ -338,16 +342,18 @@ export function JsonBodyInput({
           >
             <ListChevronsUpDownIcon className="size-3" />
           </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            onClick={handleFormat}
-            className="text-muted-foreground hover:text-foreground"
-            aria-label="Format JSON"
-          >
-            <WandSparklesIcon className="size-3" />
-          </Button>
+          {!readOnly && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleFormat}
+              className="text-muted-foreground hover:text-foreground"
+              aria-label="Format JSON"
+            >
+              <WandSparklesIcon className="size-3" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -375,6 +381,7 @@ export function JsonBodyInput({
         <textarea
           ref={editorRef}
           value={value}
+          readOnly={readOnly}
           onChange={(event) => {
             handleChange(event.target.value)
             setCursor(event.target.selectionStart ?? event.target.value.length)

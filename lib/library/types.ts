@@ -16,6 +16,7 @@ export interface LibraryItem extends LibraryItemSummary {
   headers: Record<string, string>
   query: Record<string, string>
   body: string
+  bodyExample: string
   timeoutMs: number
   verifyTls: boolean
   ipVersion: CallIpVersion
@@ -33,6 +34,7 @@ export interface LibraryItemInput {
   headers?: Record<string, string>
   query?: Record<string, string>
   body?: string
+  bodyExample?: string
   timeoutMs?: number
   verifyTls?: boolean
   ipVersion?: CallIpVersion

@@ -33,8 +33,8 @@ import {
 import { toast } from "sonner"
 import { useMemo, useRef, useState } from "react"
 
-/** Same limit as the server: 2 MB of content. */
-const MAX_CONTENT_BYTES = 2 * 1024 * 1024
+/** Same limit as the server: 10 MB of content. */
+const MAX_CONTENT_BYTES = 10 * 1024 * 1024
 
 const IMPORT_FORMATS: LibraryImportFormat[] = ["openapi", "postman", "curl"]
 
@@ -376,7 +376,7 @@ export function LibraryImportDrawer({
   const onFile = async (file: File | undefined) => {
     if (!file) return
     if (file.size > MAX_CONTENT_BYTES) {
-      setError("This file is larger than 2 MB.")
+      setError("This file is larger than 10 MB.")
       return
     }
     const text = await file.text()
@@ -550,7 +550,7 @@ export function LibraryImportDrawer({
               <Label htmlFor="import-file">Import file</Label>
               <p className="text-xs text-muted-foreground">
                 OpenAPI 3 (JSON / YAML), Postman collection v2.1, or cURL
-                commands. Max 2 MB.
+                commands. Max 10 MB.
               </p>
               <input
                 ref={fileInputRef}
