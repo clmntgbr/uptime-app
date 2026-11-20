@@ -29,7 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
-import { Skeleton } from "@/components/ui/skeleton"
+import { CallDrawerSkeleton } from "@/components/ui/drawer-form-skeleton"
 import {
   Sheet,
   SheetContent,
@@ -133,7 +133,7 @@ export function LibraryItemDrawer({
         <SheetContent
           nested
           showCloseButton
-          className="flex h-full w-[min(40rem,90vw)]! max-w-[90vw]! flex-col gap-0 p-0 sm:max-w-[min(40rem,90vw)]!"
+          className="flex h-full w-[80vw]! max-w-[80vw]! flex-col gap-0 p-0 sm:max-w-[80vw]!"
         >
           <SheetHeader className="sr-only">
             <SheetTitle>
@@ -142,11 +142,7 @@ export function LibraryItemDrawer({
           </SheetHeader>
 
           {isEdit && itemQuery.isLoading ? (
-            <div className="space-y-4 px-6 py-8">
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-9 w-full" />
-              <Skeleton className="h-32 w-full" />
-            </div>
+            <CallDrawerSkeleton />
           ) : isEdit && itemQuery.error ? (
             <p className="px-6 py-8 text-destructive">
               {itemQuery.error.message}
@@ -277,213 +273,225 @@ function LibraryItemForm({
       className="flex min-h-0 flex-1 flex-col"
     >
       <div className="min-h-0 flex-1 overflow-auto px-6 py-8">
-        <div className="space-y-1">
-          <h2 className="font-semibold">General information</h2>
-          <p className="text-sm text-muted-foreground">
-            Name, method, and URL. Use {"{{name}}"} for global variables; other
-            placeholders are filled when the item is added to a workflow.
-          </p>
-        </div>
-        <div className="mt-6 flex flex-col gap-6">
-          <div className="space-y-2">
-            <Label htmlFor="library-name">
-              Name <span className="text-destructive">*</span>
-            </Label>
-            <Input
-              id="library-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              maxLength={100}
-              required
-              className={FIELD_CLASS_NAME}
-            />
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
+          <div className="space-y-1">
+            <h2 className="font-semibold">General Information</h2>
+            <p className="text-sm text-muted-foreground">
+              Name, method, and URL. Use {"{{name}}"} for global variables;
+              other placeholders are filled when the item is added to a
+              workflow.
+            </p>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="library-description">Description</Label>
-            <Textarea
-              id="library-description"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              maxLength={500}
-              rows={2}
-              className={FIELD_CLASS_NAME}
-            />
-          </div>
-
-          <div className="flex items-start gap-3">
-            <div className="w-[8.5rem] shrink-0 space-y-2">
-              <Label htmlFor="library-method">Method</Label>
-              <Select
-                value={method}
-                onValueChange={(value) => setMethod(value as CallMethod)}
-              >
-                <SelectTrigger
-                  id="library-method"
-                  className={SELECT_TRIGGER_CLASS_NAME}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {METHODS.map((value) => (
-                    <SelectItem key={value} value={value}>
-                      {value}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="min-w-0 flex-1 space-y-2">
-              <Label htmlFor="library-url">
-                URL <span className="text-destructive">*</span>
+          <div className="flex flex-col gap-6 md:col-span-2">
+            <div className="space-y-2">
+              <Label htmlFor="library-name">
+                Name <span className="text-destructive">*</span>
               </Label>
-              <VariableInput
-                id="library-url"
-                value={url}
-                onChange={setUrl}
-                variables={variables}
-                placeholder="https://api.example.com/{{path}}"
-                maxLength={2048}
+              <Input
+                id="library-name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                maxLength={100}
                 required
                 className={FIELD_CLASS_NAME}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="library-description">Description</Label>
+              <Textarea
+                id="library-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                maxLength={500}
+                rows={2}
+                className={FIELD_CLASS_NAME}
+              />
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-[8.5rem] shrink-0 space-y-2">
+                <Label htmlFor="library-method">Method</Label>
+                <Select
+                  value={method}
+                  onValueChange={(value) => setMethod(value as CallMethod)}
+                >
+                  <SelectTrigger
+                    id="library-method"
+                    className={SELECT_TRIGGER_CLASS_NAME}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {METHODS.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="min-w-0 flex-1 space-y-2">
+                <Label htmlFor="library-url">
+                  URL <span className="text-destructive">*</span>
+                </Label>
+                <VariableInput
+                  id="library-url"
+                  value={url}
+                  onChange={setUrl}
+                  variables={variables}
+                  placeholder="https://api.example.com/{{path}}"
+                  maxLength={2048}
+                  required
+                  className={FIELD_CLASS_NAME}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator className="my-10" />
+
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
+          <div className="space-y-1">
+            <h2 className="font-semibold">Request</h2>
+            <p className="text-sm text-muted-foreground">
+              Headers, query parameters, and body.
+            </p>
+          </div>
+          <div className="flex flex-col gap-6 md:col-span-2">
+            <KeyValueEditor
+              label="Headers"
+              description="Optional HTTP headers"
+              pairs={headers}
+              onChange={setHeaders}
+              variables={variables}
+              keyPlaceholder="Header"
+              valuePlaceholder="Value"
+              addLabel="Add header"
+            />
+
+            <KeyValueEditor
+              label="Query"
+              description="Optional query string parameters"
+              pairs={query}
+              onChange={setQuery}
+              variables={variables}
+              keyPlaceholder="Param"
+              valuePlaceholder="Value"
+              addLabel="Add query"
+            />
+
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <Label>Body</Label>
+                <p className="text-xs text-muted-foreground">
+                  Optional JSON request body
+                </p>
+              </div>
+              <JsonBodyInput
+                value={body}
+                onChange={setBody}
+                title="Body"
+                variables={variables}
               />
             </div>
           </div>
         </div>
 
-        <Separator className="my-8" />
+        <Separator className="my-10" />
 
-        <div className="space-y-1">
-          <h2 className="font-semibold">Request</h2>
-          <p className="text-sm text-muted-foreground">
-            Headers, query parameters, and body.
-          </p>
-        </div>
-        <div className="mt-6 flex flex-col gap-6">
-          <KeyValueEditor
-            label="Headers"
-            description="Optional HTTP headers"
-            pairs={headers}
-            onChange={setHeaders}
-            variables={variables}
-            keyPlaceholder="Header"
-            valuePlaceholder="Value"
-            addLabel="Add header"
-          />
-
-          <KeyValueEditor
-            label="Query"
-            description="Optional query string parameters"
-            pairs={query}
-            onChange={setQuery}
-            variables={variables}
-            keyPlaceholder="Param"
-            valuePlaceholder="Value"
-            addLabel="Add query"
-          />
-
-          <div className="space-y-2">
-            <Label>Body</Label>
-            <p className="text-xs text-muted-foreground">
-              Optional JSON request body
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-3">
+          <div className="space-y-1">
+            <h2 className="font-semibold">Execution</h2>
+            <p className="text-sm text-muted-foreground">
+              Timeout, TLS, and network settings.
             </p>
-            <JsonBodyInput
-              value={body}
-              onChange={setBody}
-              title="Body"
-              variables={variables}
-            />
           </div>
-        </div>
-
-        <Separator className="my-8" />
-
-        <div className="space-y-1">
-          <h2 className="font-semibold">Execution</h2>
-          <p className="text-sm text-muted-foreground">
-            Timeout, TLS, and network settings.
-          </p>
-        </div>
-        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="library-timeout">
-              Timeout (ms) <span className="text-destructive">*</span>
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              Between 100 and 60000 ms
-            </p>
-            <Input
-              id="library-timeout"
-              type="number"
-              min={100}
-              max={60000}
-              value={timeoutMs}
-              onChange={(event) => setTimeoutMs(event.target.value)}
-              required
-              className={FIELD_CLASS_NAME}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="library-ip-version">IP version</Label>
-            <p className="text-xs text-muted-foreground">
-              When empty, any IP version is used.
-            </p>
-            <div className="relative">
-              <Select
-                value={ipVersion ?? ""}
-                onValueChange={(value) =>
-                  setIpVersion(value as Exclude<CallIpVersion, "any">)
-                }
-              >
-                <SelectTrigger
-                  id="library-ip-version"
-                  className={SELECT_TRIGGER_CLASS_NAME}
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {IP_VERSIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {ipVersion && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute end-8 top-1/2 size-6 -translate-y-1/2"
-                  aria-label="Clear IP version"
-                  onClick={() => setIpVersion(undefined)}
-                >
-                  <XIcon className="size-3.5" />
-                </Button>
-              )}
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:col-span-2">
+            <div className="space-y-2">
+              <Label htmlFor="library-timeout">
+                Timeout (ms) <span className="text-destructive">*</span>
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Between 100 and 60000 ms
+              </p>
+              <Input
+                id="library-timeout"
+                type="number"
+                min={100}
+                max={60000}
+                value={timeoutMs}
+                onChange={(event) => setTimeoutMs(event.target.value)}
+                required
+                className={FIELD_CLASS_NAME}
+              />
             </div>
-          </div>
 
-          <div className="flex items-center space-x-2 sm:col-span-2">
-            <Switch
-              id="library-verify-tls"
-              checked={verifyTls}
-              onCheckedChange={setVerifyTls}
-            />
-            <Label htmlFor="library-verify-tls">Verify TLS certificate</Label>
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="library-ip-version">IP version</Label>
+              <p className="text-xs text-muted-foreground">
+                When empty, any IP version is used.
+              </p>
+              <div className="relative">
+                <Select
+                  value={ipVersion ?? ""}
+                  onValueChange={(value) =>
+                    setIpVersion(value as Exclude<CallIpVersion, "any">)
+                  }
+                >
+                  <SelectTrigger
+                    id="library-ip-version"
+                    className={SELECT_TRIGGER_CLASS_NAME}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {IP_VERSIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {ipVersion && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute end-8 top-1/2 size-6 -translate-y-1/2"
+                    aria-label="Clear IP version"
+                    onClick={() => setIpVersion(undefined)}
+                  >
+                    <XIcon className="size-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
 
-          <div className="space-y-2 sm:col-span-2">
-            <Label htmlFor="library-proxy">Proxy URL</Label>
-            <VariableInput
-              id="library-proxy"
-              value={proxyUrl}
-              onChange={setProxyUrl}
-              variables={variables}
-              maxLength={2048}
-              className={FIELD_CLASS_NAME}
-            />
+            <div className="flex items-center space-x-2 sm:col-span-2">
+              <Switch
+                id="library-verify-tls"
+                checked={verifyTls}
+                onCheckedChange={setVerifyTls}
+              />
+              <Label htmlFor="library-verify-tls">Verify TLS certificate</Label>
+            </div>
+
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="library-proxy">Proxy URL</Label>
+              <p className="text-xs text-muted-foreground">
+                Optional HTTP proxy for this request.
+              </p>
+              <VariableInput
+                id="library-proxy"
+                value={proxyUrl}
+                onChange={setProxyUrl}
+                variables={variables}
+                maxLength={2048}
+                className={FIELD_CLASS_NAME}
+              />
+            </div>
           </div>
         </div>
 

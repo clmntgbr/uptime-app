@@ -47,6 +47,7 @@ import {
   SearchIcon,
   UploadIcon,
 } from "lucide-react"
+import { SHEET_CLOSE_MS } from "@/components/ui/sheet"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
 
@@ -80,6 +81,22 @@ export function LibraryDrawer({ open, onOpenChange }: LibraryDrawerProps) {
   const [itemToDelete, setItemToDelete] = useState<LibraryItemSummary | null>(
     null
   )
+  /** Nested sheet close can bubble to the parent — ignore dismiss briefly. */
+  const ignoreParentCloseRef = useRef(false)
+
+  const keepLibraryOpenWhileNestedCloses = () => {
+    ignoreParentCloseRef.current = true
+    window.setTimeout(() => {
+      ignoreParentCloseRef.current = false
+    }, SHEET_CLOSE_MS + 50)
+  }
+
+  const handleLibraryOpenChange = (next: boolean) => {
+    if (!next && (editorOpen || importOpen || ignoreParentCloseRef.current)) {
+      return
+    }
+    onOpenChange(next)
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(
@@ -165,7 +182,7 @@ export function LibraryDrawer({ open, onOpenChange }: LibraryDrawerProps) {
 
   return (
     <>
-      <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
+      <Sheet open={open} onOpenChange={handleLibraryOpenChange} modal={false}>
         <SheetContent
           side="left"
           overlay={false}
@@ -321,11 +338,20 @@ export function LibraryDrawer({ open, onOpenChange }: LibraryDrawerProps) {
         </SheetContent>
       </Sheet>
 
-      <LibraryImportDrawer open={importOpen} onOpenChange={setImportOpen} />
+      <LibraryImportDrawer
+        open={importOpen}
+        onOpenChange={(next) => {
+          if (!next) keepLibraryOpenWhileNestedCloses()
+          setImportOpen(next)
+        }}
+      />
 
       <LibraryItemDrawer
         open={editorOpen}
-        onOpenChange={setEditorOpen}
+        onOpenChange={(next) => {
+          if (!next) keepLibraryOpenWhileNestedCloses()
+          setEditorOpen(next)
+        }}
         itemId={editedId}
       />
 

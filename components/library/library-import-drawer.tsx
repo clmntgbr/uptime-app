@@ -512,7 +512,7 @@ export function LibraryImportDrawer({
   const message = error ?? confirmMutation.error?.message ?? null
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
+    <Sheet open={open} onOpenChange={handleOpenChange} modal={false}>
       <SheetContent
         nested
         showCloseButton
