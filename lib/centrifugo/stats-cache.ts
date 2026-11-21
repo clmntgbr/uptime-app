@@ -207,6 +207,37 @@ export function refetchAllWorkflowIncidents(queryClient: QueryClient) {
   })
 }
 
+const feedTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** Debounced refresh of the activity feed for a workflow. */
+export function refetchWorkflowFeed(
+  queryClient: QueryClient,
+  workflowId: string
+) {
+  const existing = feedTimers.get(workflowId)
+  if (existing) clearTimeout(existing)
+  feedTimers.set(
+    workflowId,
+    setTimeout(() => {
+      feedTimers.delete(workflowId)
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.feed.all(workflowId),
+      })
+    }, CONTEXT_DEBOUNCE_MS)
+  )
+}
+
+export function refetchAllWorkflowFeed(queryClient: QueryClient) {
+  for (const timer of feedTimers.values()) clearTimeout(timer)
+  feedTimers.clear()
+  return queryClient.invalidateQueries({
+    predicate: (query) =>
+      Array.isArray(query.queryKey) &&
+      query.queryKey[0] === "workflows" &&
+      query.queryKey[2] === "feed",
+  })
+}
+
 /** Reset every library list (infinite pages included) after import / reconnect. */
 export function refetchLibrary(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: queryKeys.library.all })

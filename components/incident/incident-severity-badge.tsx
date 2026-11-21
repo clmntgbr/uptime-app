@@ -10,6 +10,8 @@ export function severityBadgeClass(severity: IncidentSeverity | string) {
       return "border-transparent bg-orange-50 text-orange-800 dark:bg-orange-950 dark:text-orange-300"
     case "info":
       return "border-transparent bg-sky-50 text-sky-800 dark:bg-sky-950 dark:text-sky-300"
+    case "success":
+      return "border-transparent bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
     default:
       return "border-transparent bg-muted text-muted-foreground"
   }
@@ -23,6 +25,8 @@ export function severityBadgeLabel(severity: IncidentSeverity | string) {
       return "Warning"
     case "info":
       return "Info"
+    case "success":
+      return "OK"
     default:
       return String(severity)
   }

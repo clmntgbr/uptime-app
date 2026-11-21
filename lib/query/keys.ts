@@ -62,6 +62,15 @@ export const queryKeys = {
     detail: (incidentId: string) => ["incidents", incidentId] as const,
   },
 
+  feed: {
+    all: (workflowId: string) =>
+      [...queryKeys.workflows.detail(workflowId), "feed"] as const,
+    preview: (workflowId: string) =>
+      [...queryKeys.feed.all(workflowId), "preview"] as const,
+    list: (workflowId: string) =>
+      [...queryKeys.feed.all(workflowId), "list"] as const,
+  },
+
   incidentPolicies: {
     list: (workflowId: string) =>
       [...queryKeys.workflows.detail(workflowId), "incident-policies"] as const,

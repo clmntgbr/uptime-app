@@ -8,6 +8,7 @@ import {
   applyWorkflowStopped,
   refetchAllWorkflowContext,
   refetchAllWorkflowExpiry,
+  refetchAllWorkflowFeed,
   refetchAllWorkflowIncidents,
   refetchLibrary,
   refetchStatistics,
@@ -15,6 +16,7 @@ import {
   refetchWorkflowContext,
   refetchWorkflowDetail,
   refetchWorkflowExpiry,
+  refetchWorkflowFeed,
   refetchWorkflowIncidents,
   refetchWorkflowRuns,
 } from "./stats-cache"
@@ -47,6 +49,7 @@ export function UserCentrifugeListener() {
       if (eventTypeEquals(event, "expiry.alerted")) {
         if (event.workflowId) {
           refetchWorkflowExpiry(queryClient, event.workflowId, "items")
+          refetchWorkflowFeed(queryClient, event.workflowId)
         }
         return
       }
@@ -64,6 +67,7 @@ export function UserCentrifugeListener() {
       ) {
         if (event.workflowId) {
           refetchWorkflowIncidents(queryClient, event.workflowId)
+          refetchWorkflowFeed(queryClient, event.workflowId)
         }
         return
       }
@@ -104,6 +108,7 @@ export function UserCentrifugeListener() {
         refetchWorkflowContext(queryClient, event.workflowId)
         refetchWorkflowExpiry(queryClient, event.workflowId, "items")
         refetchWorkflowIncidents(queryClient, event.workflowId)
+        refetchWorkflowFeed(queryClient, event.workflowId)
       }
     },
     [queryClient]
@@ -114,6 +119,7 @@ export function UserCentrifugeListener() {
     void refetchAllWorkflowContext(queryClient)
     void refetchAllWorkflowExpiry(queryClient)
     void refetchAllWorkflowIncidents(queryClient)
+    void refetchAllWorkflowFeed(queryClient)
     void refetchLibrary(queryClient)
     void queryClient.invalidateQueries({
       predicate: (query) =>

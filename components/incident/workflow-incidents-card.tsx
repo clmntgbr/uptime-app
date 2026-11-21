@@ -19,6 +19,7 @@ import {
 import { IncidentDetailDrawer } from "@/components/incident/incident-detail-drawer"
 import { IncidentRow } from "@/components/incident/incident-row"
 import { IncidentsListDrawer } from "@/components/incident/incidents-list-drawer"
+import { FeedCard } from "@/components/feed/feed-card"
 import { LatestRunCard } from "@/components/workflow/latest-run-card"
 import { ApiError } from "@/lib/api-error"
 import { useCalls } from "@/lib/call/hooks"
@@ -160,6 +161,9 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
         )}
         <div className="h-full md:col-span-1">
           <LatestRunCard workflowId={workflowId} />
+        </div>
+        <div className="h-full md:col-span-1">
+          <FeedCard workflowId={workflowId} />
         </div>
       </div>
 

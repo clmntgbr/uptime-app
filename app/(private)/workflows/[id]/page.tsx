@@ -130,6 +130,7 @@ export default function WorkflowPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Skeleton className="h-56 w-full rounded-lg" />
             <Skeleton className="h-56 w-full rounded-lg" />
+            <Skeleton className="h-56 w-full rounded-lg" />
           </div>
           <Skeleton className="h-[600px] w-full rounded-xl" />
         </div>
