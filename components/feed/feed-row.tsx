@@ -7,6 +7,8 @@ import {
   type FeedEvent,
 } from "@/lib/feed/types"
 import { formatRelativeTime } from "@/lib/stats/format"
+import { OVERVIEW_ROW_CLASS } from "@/lib/workflow/overview-cards"
+import { cn } from "@/lib/utils"
 
 export function FeedRow({
   event,
@@ -34,7 +36,7 @@ export function FeedRow({
   )
 
   return (
-    <li className="border-b border-border/60 py-2.5 last:border-0 last:pb-0 first:pt-0">
+    <li className={cn(OVERVIEW_ROW_CLASS, "flex flex-col justify-center")}>
       {onOpen ? (
         <button
           type="button"

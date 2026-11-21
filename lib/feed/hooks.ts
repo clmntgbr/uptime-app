@@ -2,16 +2,17 @@
 
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import { queryKeys } from "@/lib/query/keys"
+import { OVERVIEW_PREVIEW_LIMIT } from "@/lib/workflow/overview-cards"
 import { listFeed } from "./api"
 
-export const FEED_PREVIEW_LIMIT = 5
+export const FEED_PREVIEW_LIMIT = OVERVIEW_PREVIEW_LIMIT
 export const FEED_PAGE_SIZE = 40
 
 export function useFeedPreview(workflowId: string) {
   return useQuery({
     queryKey: queryKeys.feed.preview(workflowId),
     queryFn: () =>
-      listFeed({ workflowId, limit: FEED_PREVIEW_LIMIT }),
+      listFeed({ workflowId, limit: OVERVIEW_PREVIEW_LIMIT }),
     enabled: Boolean(workflowId),
   })
 }

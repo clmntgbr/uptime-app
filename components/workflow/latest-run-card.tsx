@@ -29,9 +29,12 @@ import type { ContextCall } from "@/lib/context/types"
 import { formatLatencyMs, formatRunStatusLabel } from "@/lib/stats/format"
 import { cn } from "@/lib/utils"
 import { useRunWorkflow } from "@/lib/workflow/hooks"
+import {
+  OVERVIEW_LIST_CLASS,
+  OVERVIEW_PREVIEW_LIMIT,
+  OVERVIEW_ROW_CLASS,
+} from "@/lib/workflow/overview-cards"
 import { useId, useMemo, useState } from "react"
-
-const PREVIEW_LIMIT = 5
 
 function callBarClass(status: string) {
   if (status === "success") return "bg-emerald-500"
@@ -73,7 +76,7 @@ function CallCascadeRow({
   )
 
   const rowClass =
-    "flex w-full flex-col gap-1 rounded-md px-0.5 py-1 text-start"
+    "flex w-full flex-col justify-center gap-1 rounded-md text-start"
 
   return (
     <Tooltip>
@@ -113,15 +116,20 @@ function CallCascadeList({
   calls,
   runDurationMs,
   onOpenCall,
+  className,
 }: {
   calls: ContextCall[]
   runDurationMs: number
   onOpenCall: (callId: string) => void
+  className?: string
 }) {
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className={cn(className)}>
       {calls.map((call) => (
-        <li key={`${call.position}-${call.callId ?? call.name}`}>
+        <li
+          key={`${call.position}-${call.callId ?? call.name}`}
+          className={OVERVIEW_ROW_CLASS}
+        >
           <CallCascadeRow
             call={call}
             runDurationMs={runDurationMs}
@@ -151,8 +159,8 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
     return [...calls].sort((a, b) => a.position - b.position)
   }, [query.data?.run?.calls])
 
-  const previewCalls = orderedCalls.slice(0, PREVIEW_LIMIT)
-  const hasMore = orderedCalls.length > PREVIEW_LIMIT
+  const previewCalls = orderedCalls.slice(0, OVERVIEW_PREVIEW_LIMIT)
+  const hasMore = orderedCalls.length > OVERVIEW_PREVIEW_LIMIT
   const run = query.data?.run
 
   return (
@@ -184,15 +192,16 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
             )}
           </div>
         </CardHeader>
-        <CardContent className="flex-1">
+        <CardContent className="flex min-h-0 flex-1 flex-col">
           {query.isLoading ? (
-            <div className="flex flex-col gap-3">
+            <div className={cn(OVERVIEW_LIST_CLASS, "gap-3")}>
               <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
               <Skeleton className="h-8 w-full" />
             </div>
           ) : query.error ? (
-            <div className="flex flex-col items-start gap-2">
+            <div className={cn(OVERVIEW_LIST_CLASS, "justify-center gap-2")}>
               <p className="text-destructive">{query.error.message}</p>
               <Button
                 type="button"
@@ -204,7 +213,7 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
               </Button>
             </div>
           ) : !run ? (
-            <div className="flex flex-col items-start gap-3">
+            <div className={cn(OVERVIEW_LIST_CLASS, "justify-center gap-3")}>
               <p className="text-muted-foreground">No runs yet</p>
               <Button
                 type="button"
@@ -220,11 +229,12 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
               calls={previewCalls}
               runDurationMs={run.durationMs}
               onOpenCall={openCall}
+              className={OVERVIEW_LIST_CLASS}
             />
           )}
         </CardContent>
-        {run && hasMore ? (
-          <CardFooter className="mt-auto border-t pt-3">
+        <CardFooter className="mt-auto min-h-10 border-t pt-3">
+          {run ? (
             <Button
               type="button"
               variant="ghost"
@@ -232,10 +242,16 @@ export function LatestRunCard({ workflowId }: { workflowId: string }) {
               className="px-0"
               onClick={() => setAllCallsOpen(true)}
             >
-              See all ({orderedCalls.length})
+              {hasMore
+                ? `See all (${orderedCalls.length})`
+                : "See all"}
             </Button>
-          </CardFooter>
-        ) : null}
+          ) : (
+            <span className="invisible text-sm" aria-hidden>
+              See all
+            </span>
+          )}
+        </CardFooter>
       </Card>
 
       <Dialog open={allCallsOpen} onOpenChange={setAllCallsOpen}>

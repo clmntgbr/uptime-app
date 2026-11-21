@@ -7,6 +7,8 @@ import {
   type IncidentListItem,
 } from "@/lib/incident/types"
 import { formatRelativeTime } from "@/lib/stats/format"
+import { OVERVIEW_ROW_CLASS } from "@/lib/workflow/overview-cards"
+import { cn } from "@/lib/utils"
 
 export function IncidentRow({
   incident,
@@ -31,7 +33,12 @@ export function IncidentRow({
     .join(" · ")
 
   return (
-    <li className="flex items-start justify-between gap-2 border-b border-border/60 py-2.5 last:border-0 last:pb-0 first:pt-0">
+    <li
+      className={cn(
+        OVERVIEW_ROW_CLASS,
+        "flex items-center justify-between gap-2"
+      )}
+    >
       <button
         type="button"
         className="min-w-0 flex flex-1 flex-col gap-1 rounded-md text-start hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"

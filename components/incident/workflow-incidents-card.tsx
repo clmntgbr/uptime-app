@@ -28,12 +28,14 @@ import {
   useActiveIncidents,
 } from "@/lib/incident/hooks"
 import { SHEET_CLOSE_MS } from "@/components/ui/sheet"
+import {
+  OVERVIEW_LIST_CLASS,
+  OVERVIEW_PREVIEW_LIMIT,
+} from "@/lib/workflow/overview-cards"
 import { cn } from "@/lib/utils"
 import { CheckCircle2Icon } from "lucide-react"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
-
-const PREVIEW_LIMIT = 4
 
 export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
   const incidentsQuery = useActiveIncidents(workflowId)
@@ -56,8 +58,8 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
   const total = incidentsQuery.data?.total ?? members.length
   const incidentsReady =
     !incidentsQuery.isLoading && !incidentsQuery.isError
-  const preview = members.slice(0, PREVIEW_LIMIT)
-  const hasMore = total > PREVIEW_LIMIT
+  const preview = members.slice(0, OVERVIEW_PREVIEW_LIMIT)
+  const hasMore = total > OVERVIEW_PREVIEW_LIMIT
   const isEmpty = members.length === 0
 
   const openDetail = (id: string) => {
@@ -87,30 +89,29 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
 
   return (
     <>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {!incidentsReady ? (
-          <Card size="sm" className="h-full md:col-span-1">
-            <CardHeader className="pb-0">
+      <div className="grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card size="sm" className="h-full md:col-span-1">
+          <CardHeader className="border-b">
+            {!incidentsReady ? (
               <Skeleton className="h-4 w-20" />
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-3">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-4/5" />
-            </CardContent>
-          </Card>
-        ) : (
-          <Card size="sm" className="h-full md:col-span-1">
-            <CardHeader className="pb-0">
+            ) : (
               <CardTitle>Incidents</CardTitle>
-            </CardHeader>
-            <CardContent
-              className={cn(
-                "flex-1",
-                isEmpty && "flex items-center justify-center"
-              )}
-            >
-              {isEmpty ? (
+            )}
+          </CardHeader>
+          <CardContent className="flex min-h-0 flex-1 flex-col">
+            {!incidentsReady ? (
+              <div className={cn(OVERVIEW_LIST_CLASS, "gap-3")}>
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-4/5" />
+              </div>
+            ) : isEmpty ? (
+              <div
+                className={cn(
+                  OVERVIEW_LIST_CLASS,
+                  "items-center justify-center"
+                )}
+              >
                 <Empty className="border-0 p-4 md:p-6">
                   <EmptyHeader>
                     <EmptyMedia variant="icon">
@@ -122,43 +123,47 @@ export function WorkflowIncidentsCard({ workflowId }: { workflowId: string }) {
                     </EmptyDescription>
                   </EmptyHeader>
                 </Empty>
-              ) : (
-                <ul className="flex flex-col">
-                  {preview.map((incident) => (
-                    <IncidentRow
-                      key={incident.id}
-                      incident={incident}
-                      callName={
-                        incident.callId
-                          ? callNameById.get(incident.callId)
-                          : undefined
-                      }
-                      acknowledging={
-                        acknowledgeMutation.isPending &&
-                        acknowledgeMutation.variables === incident.id
-                      }
-                      onOpen={() => openDetail(incident.id)}
-                      onAcknowledge={handleAcknowledge}
-                    />
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-            {hasMore ? (
-              <CardFooter className="mt-auto border-t pt-3">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="px-0"
-                  onClick={() => setListOpen(true)}
-                >
-                  See all ({total})
-                </Button>
-              </CardFooter>
-            ) : null}
-          </Card>
-        )}
+              </div>
+            ) : (
+              <ul className={OVERVIEW_LIST_CLASS}>
+                {preview.map((incident) => (
+                  <IncidentRow
+                    key={incident.id}
+                    incident={incident}
+                    callName={
+                      incident.callId
+                        ? callNameById.get(incident.callId)
+                        : undefined
+                    }
+                    acknowledging={
+                      acknowledgeMutation.isPending &&
+                      acknowledgeMutation.variables === incident.id
+                    }
+                    onOpen={() => openDetail(incident.id)}
+                    onAcknowledge={handleAcknowledge}
+                  />
+                ))}
+              </ul>
+            )}
+          </CardContent>
+          <CardFooter className="mt-auto min-h-10 border-t pt-3">
+            {incidentsReady && !isEmpty ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="px-0"
+                onClick={() => setListOpen(true)}
+              >
+                {hasMore ? `See all (${total})` : "See all"}
+              </Button>
+            ) : (
+              <span className="invisible text-sm" aria-hidden>
+                See all
+              </span>
+            )}
+          </CardFooter>
+        </Card>
         <div className="h-full md:col-span-1">
           <LatestRunCard workflowId={workflowId} />
         </div>
