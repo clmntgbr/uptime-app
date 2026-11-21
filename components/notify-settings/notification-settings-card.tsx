@@ -1,5 +1,6 @@
 "use client"
 
+import { EmailRecipientsInput } from "@/components/notify-settings/email-recipients-input"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -9,16 +10,31 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
-import { EmailRecipientsInput } from "@/components/notify-settings/email-recipients-input"
 import { ApiError } from "@/lib/api-error"
 import {
   useNotificationSettings,
   useUpsertNotificationSettings,
 } from "@/lib/notify-settings/hooks"
-import type { NotificationSettings } from "@/lib/notify-settings/types"
+import {
+  DEFAULT_RUN_STATUSES,
+  RUN_MODE_OPTIONS,
+  RUN_STATUS_OPTIONS,
+  type NotificationSettings,
+  type RunNotifyMode,
+  type RunNotifyStatus,
+  type UpsertNotificationSettingsInput,
+} from "@/lib/notify-settings/types"
 import {
   forwardRef,
   useEffect,
@@ -33,15 +49,28 @@ export type NotificationSettingsCardHandle = {
   save: () => Promise<void>
 }
 
-function formSnapshot(s: {
-  emails: string[]
-  incidentsEnabled: boolean
-  tlsEnabled: boolean
-}) {
+type FormState = UpsertNotificationSettingsInput
+
+function normalizeRunStatuses(raw: string[] | undefined): RunNotifyStatus[] {
+  const allowed = new Set(RUN_STATUS_OPTIONS.map((o) => o.value))
+  const next = (raw ?? [])
+    .map((s) => s.toLowerCase().trim())
+    .filter((s): s is RunNotifyStatus => allowed.has(s as RunNotifyStatus))
+  return next.length > 0 ? next : [...DEFAULT_RUN_STATUSES]
+}
+
+function normalizeRunMode(raw: string | undefined): RunNotifyMode {
+  return raw === "every" ? "every" : "transition"
+}
+
+function formSnapshot(s: FormState) {
   return JSON.stringify({
     emails: [...s.emails].sort(),
     incidentsEnabled: s.incidentsEnabled,
     tlsEnabled: s.tlsEnabled,
+    runsEnabled: s.runsEnabled,
+    runStatuses: [...s.runStatuses].sort(),
+    runMode: s.runMode,
   })
 }
 
@@ -50,8 +79,22 @@ function serverSnapshot(s: NotificationSettings) {
     emails: [...(s.emails ?? [])].sort(),
     incidentsEnabled: s.incidentsEnabled,
     tlsEnabled: s.tlsEnabled,
+    runsEnabled: s.runsEnabled,
+    runStatuses: normalizeRunStatuses(s.runStatuses).slice().sort(),
+    runMode: normalizeRunMode(s.runMode),
     updatedAt: s.updatedAt ?? null,
   })
+}
+
+function toFormState(s: NotificationSettings): FormState {
+  return {
+    emails: [...(s.emails ?? [])],
+    incidentsEnabled: s.incidentsEnabled,
+    tlsEnabled: s.tlsEnabled,
+    runsEnabled: Boolean(s.runsEnabled),
+    runStatuses: normalizeRunStatuses(s.runStatuses),
+    runMode: normalizeRunMode(s.runMode),
+  }
 }
 
 export const NotificationSettingsCard = forwardRef<
@@ -73,27 +116,45 @@ export const NotificationSettingsCard = forwardRef<
   const [emails, setEmails] = useState<string[]>([])
   const [incidentsEnabled, setIncidentsEnabled] = useState(true)
   const [tlsEnabled, setTlsEnabled] = useState(true)
+  const [runsEnabled, setRunsEnabled] = useState(false)
+  const [runStatuses, setRunStatuses] = useState<RunNotifyStatus[]>([
+    ...DEFAULT_RUN_STATUSES,
+  ])
+  const [runMode, setRunMode] = useState<RunNotifyMode>("transition")
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
   const [remoteChanged, setRemoteChanged] = useState(false)
   const lastServerRef = useRef("")
   const appliedFormRef = useRef("")
-  const formRef = useRef({ emails, incidentsEnabled, tlsEnabled })
-  formRef.current = { emails, incidentsEnabled, tlsEnabled }
+  const formRef = useRef<FormState>({
+    emails,
+    incidentsEnabled,
+    tlsEnabled,
+    runsEnabled,
+    runStatuses,
+    runMode,
+  })
+  formRef.current = {
+    emails,
+    incidentsEnabled,
+    tlsEnabled,
+    runsEnabled,
+    runStatuses,
+    runMode,
+  }
 
   const applySettings = (s: NotificationSettings) => {
-    const nextEmails = [...(s.emails ?? [])]
-    setEmails(nextEmails)
-    setIncidentsEnabled(s.incidentsEnabled)
-    setTlsEnabled(s.tlsEnabled)
+    const next = toFormState(s)
+    setEmails(next.emails)
+    setIncidentsEnabled(next.incidentsEnabled)
+    setTlsEnabled(next.tlsEnabled)
+    setRunsEnabled(next.runsEnabled)
+    setRunStatuses(next.runStatuses as RunNotifyStatus[])
+    setRunMode(next.runMode)
     setRemoteChanged(false)
     setFieldError(null)
     lastServerRef.current = serverSnapshot(s)
-    appliedFormRef.current = formSnapshot({
-      emails: nextEmails,
-      incidentsEnabled: s.incidentsEnabled,
-      tlsEnabled: s.tlsEnabled,
-    })
+    appliedFormRef.current = formSnapshot(next)
   }
 
   useEffect(() => {
@@ -105,28 +166,42 @@ export const NotificationSettingsCard = forwardRef<
       return
     }
     if (serialized === lastServerRef.current) return
-    const dirty =
-      formSnapshot({ emails, incidentsEnabled, tlsEnabled }) !==
-      appliedFormRef.current
+    const dirty = formSnapshot(formRef.current) !== appliedFormRef.current
     if (dirty) {
       setRemoteChanged(true)
       lastServerRef.current = serialized
       return
     }
     applySettings(query.data)
-  }, [query.data, initialized, emails, incidentsEnabled, tlsEnabled])
+  }, [
+    query.data,
+    initialized,
+    emails,
+    incidentsEnabled,
+    tlsEnabled,
+    runsEnabled,
+    runStatuses,
+    runMode,
+  ])
 
   const dirty =
-    initialized &&
-    formSnapshot({ emails, incidentsEnabled, tlsEnabled }) !==
-      appliedFormRef.current
+    initialized && formSnapshot(formRef.current) !== appliedFormRef.current
+
+  const toggleRunStatus = (status: RunNotifyStatus, checked: boolean) => {
+    setRunStatuses((prev) => {
+      if (checked) {
+        return prev.includes(status) ? prev : [...prev, status]
+      }
+      const next = prev.filter((s) => s !== status)
+      return next.length > 0 ? next : prev
+    })
+  }
 
   const handleSave = async ({ silent = false }: { silent?: boolean } = {}) => {
     const current = formRef.current
-    const dirty =
-      initialized &&
-      formSnapshot(current) !== appliedFormRef.current
-    if (!dirty) return
+    const isDirty =
+      initialized && formSnapshot(current) !== appliedFormRef.current
+    if (!isDirty) return
 
     setFieldError(null)
     try {
@@ -171,7 +246,11 @@ export const NotificationSettingsCard = forwardRef<
           <CardDescription>Failed to load settings.</CardDescription>
         </CardHeader>
         <CardFooter>
-          <Button type="button" variant="outline" onClick={() => void query.refetch()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void query.refetch()}
+          >
             Retry
           </Button>
         </CardFooter>
@@ -185,7 +264,7 @@ export const NotificationSettingsCard = forwardRef<
         <CardHeader>
           <CardTitle id={titleId}>Email</CardTitle>
           <CardDescription>
-            Who receives mail for incidents and TLS certificate alerts.
+            Who receives mail for incidents, TLS certificates, and runs.
           </CardDescription>
         </CardHeader>
       ) : null}
@@ -199,7 +278,7 @@ export const NotificationSettingsCard = forwardRef<
         <FamilySwitch
           id={`${titleId}-incidents`}
           label="Incidents"
-          description="Opened, reminder, and resolved"
+          description="Opened, reopened, reminder, and resolved"
           checked={incidentsEnabled}
           disabled={readOnly}
           onCheckedChange={setIncidentsEnabled}
@@ -207,25 +286,77 @@ export const NotificationSettingsCard = forwardRef<
         <FamilySwitch
           id={`${titleId}-tls`}
           label="TLS certificates"
-          description="Threshold crossed and expired"
+          description="Threshold crossed, expired, and renewed"
           checked={tlsEnabled}
           disabled={readOnly}
           onCheckedChange={setTlsEnabled}
         />
 
-        <p className="text-sm text-muted-foreground">
-          <button
-            type="button"
-            className="underline underline-offset-2 hover:text-foreground"
-            onClick={() => {
-              document
-                .getElementById("workflow-incident-policies")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" })
-            }}
-          >
-            Want to be told sooner? Lower &quot;Open after&quot; in Incidents.
-          </button>
-        </p>
+        <div className="space-y-3">
+          <FamilySwitch
+            id={`${titleId}-runs`}
+            label="Runs"
+            description="Failed, errored, and successful workflow runs"
+            checked={runsEnabled}
+            disabled={readOnly}
+            onCheckedChange={setRunsEnabled}
+          />
+          {runsEnabled ? (
+            <div className="ml-0 space-y-4 rounded-md border border-border/60 p-3 sm:ml-1">
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Statuses</p>
+                <div className="space-y-2">
+                  {RUN_STATUS_OPTIONS.map((opt) => {
+                    const checked = runStatuses.includes(opt.value)
+                    const checkboxId = `${titleId}-run-${opt.value}`
+                    return (
+                      <div key={opt.value} className="flex items-start gap-3">
+                        <Checkbox
+                          id={checkboxId}
+                          checked={checked}
+                          disabled={
+                            readOnly || (checked && runStatuses.length === 1)
+                          }
+                          onCheckedChange={(v) =>
+                            toggleRunStatus(opt.value, v === true)
+                          }
+                        />
+                        <div className="space-y-0.5">
+                          <Label htmlFor={checkboxId}>{opt.label}</Label>
+                          <p className="text-sm text-muted-foreground">
+                            {opt.description}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor={`${titleId}-run-mode`}>When to send</Label>
+                <Select
+                  value={runMode}
+                  disabled={readOnly}
+                  onValueChange={(v) =>
+                    setRunMode(v === "every" ? "every" : "transition")
+                  }
+                >
+                  <SelectTrigger id={`${titleId}-run-mode`} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {RUN_MODE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label} — {opt.description}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         {fieldError && (
           <p className="text-sm text-destructive" role="alert">
