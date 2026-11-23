@@ -28,6 +28,7 @@ import {
 } from "@/lib/notify-settings/hooks"
 import {
   DEFAULT_RUN_STATUSES,
+  DIGEST_OPTIONS,
   RUN_MODE_OPTIONS,
   RUN_STATUS_OPTIONS,
   type NotificationSettings,
@@ -71,6 +72,9 @@ function formSnapshot(s: FormState) {
     runsEnabled: s.runsEnabled,
     runStatuses: [...s.runStatuses].sort(),
     runMode: s.runMode,
+    digestDaily: s.digestDaily,
+    digestWeekly: s.digestWeekly,
+    digestMonthly: s.digestMonthly,
   })
 }
 
@@ -82,6 +86,9 @@ function serverSnapshot(s: NotificationSettings) {
     runsEnabled: s.runsEnabled,
     runStatuses: normalizeRunStatuses(s.runStatuses).slice().sort(),
     runMode: normalizeRunMode(s.runMode),
+    digestDaily: Boolean(s.digestDaily),
+    digestWeekly: Boolean(s.digestWeekly),
+    digestMonthly: Boolean(s.digestMonthly),
     updatedAt: s.updatedAt ?? null,
   })
 }
@@ -94,6 +101,9 @@ function toFormState(s: NotificationSettings): FormState {
     runsEnabled: Boolean(s.runsEnabled),
     runStatuses: normalizeRunStatuses(s.runStatuses),
     runMode: normalizeRunMode(s.runMode),
+    digestDaily: Boolean(s.digestDaily),
+    digestWeekly: Boolean(s.digestWeekly),
+    digestMonthly: Boolean(s.digestMonthly),
   }
 }
 
@@ -121,6 +131,9 @@ export const NotificationSettingsCard = forwardRef<
     ...DEFAULT_RUN_STATUSES,
   ])
   const [runMode, setRunMode] = useState<RunNotifyMode>("transition")
+  const [digestDaily, setDigestDaily] = useState(false)
+  const [digestWeekly, setDigestWeekly] = useState(false)
+  const [digestMonthly, setDigestMonthly] = useState(false)
   const [fieldError, setFieldError] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
   const [remoteChanged, setRemoteChanged] = useState(false)
@@ -133,6 +146,9 @@ export const NotificationSettingsCard = forwardRef<
     runsEnabled,
     runStatuses,
     runMode,
+    digestDaily,
+    digestWeekly,
+    digestMonthly,
   })
   formRef.current = {
     emails,
@@ -141,7 +157,22 @@ export const NotificationSettingsCard = forwardRef<
     runsEnabled,
     runStatuses,
     runMode,
+    digestDaily,
+    digestWeekly,
+    digestMonthly,
   }
+
+  const digestSetters = {
+    digestDaily: setDigestDaily,
+    digestWeekly: setDigestWeekly,
+    digestMonthly: setDigestMonthly,
+  } as const
+
+  const digestValues = {
+    digestDaily,
+    digestWeekly,
+    digestMonthly,
+  } as const
 
   const applySettings = (s: NotificationSettings) => {
     const next = toFormState(s)
@@ -151,6 +182,9 @@ export const NotificationSettingsCard = forwardRef<
     setRunsEnabled(next.runsEnabled)
     setRunStatuses(next.runStatuses as RunNotifyStatus[])
     setRunMode(next.runMode)
+    setDigestDaily(next.digestDaily)
+    setDigestWeekly(next.digestWeekly)
+    setDigestMonthly(next.digestMonthly)
     setRemoteChanged(false)
     setFieldError(null)
     lastServerRef.current = serverSnapshot(s)
@@ -182,6 +216,9 @@ export const NotificationSettingsCard = forwardRef<
     runsEnabled,
     runStatuses,
     runMode,
+    digestDaily,
+    digestWeekly,
+    digestMonthly,
   ])
 
   const dirty =
@@ -264,7 +301,7 @@ export const NotificationSettingsCard = forwardRef<
         <CardHeader>
           <CardTitle id={titleId}>Email</CardTitle>
           <CardDescription>
-            Who receives mail for incidents, TLS certificates, and runs.
+            Who receives mail for incidents, TLS, runs, and summaries.
           </CardDescription>
         </CardHeader>
       ) : null}
@@ -357,6 +394,42 @@ export const NotificationSettingsCard = forwardRef<
             </div>
           ) : null}
         </div>
+
+        <div className="space-y-3">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium">Summary</p>
+            <p className="text-sm text-muted-foreground">
+              Periodic digest of runs and incidents. You can enable several.
+            </p>
+          </div>
+          {DIGEST_OPTIONS.map((opt) => (
+            <FamilySwitch
+              key={opt.key}
+              id={`${titleId}-${opt.key}`}
+              label={opt.label}
+              description={opt.description}
+              checked={digestValues[opt.key]}
+              disabled={readOnly}
+              onCheckedChange={digestSetters[opt.key]}
+            />
+          ))}
+        </div>
+
+        <p className="text-sm text-muted-foreground">
+          Workflow disabled (no calls) and one-shot finished always notify the
+          owner.{" "}
+          <button
+            type="button"
+            className="underline underline-offset-2 hover:text-foreground"
+            onClick={() => {
+              document
+                .getElementById("workflow-incident-policies")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }}
+          >
+            Want incidents sooner? Lower &quot;Open after&quot; below.
+          </button>
+        </p>
 
         {fieldError && (
           <p className="text-sm text-destructive" role="alert">

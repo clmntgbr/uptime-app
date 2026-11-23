@@ -87,7 +87,7 @@ export const WorkflowSettings = forwardRef<
 
       <SettingsSection
         title="Notifications"
-        description="Who receives mail for incidents, TLS certificates, and runs."
+        description="Who receives mail for incidents, TLS, runs, and summaries."
       >
         <NotificationSettingsCard
           ref={notificationsRef}
